@@ -6,10 +6,10 @@ $RECYCLE.BIN/
 *.lnk
 
 # PowerShell artifacts
-*.psm1
 *.cdxml
 *.pdb
 *.log
+*.ps1
 
 # IDE/Editor files
 .idea/
@@ -38,5 +38,20 @@ dist/
 security-audit-report.md
 
 # PowerShell module cache
-$env:LOCALAPPDATA\PowerShell\ModuleCache\
-$env:PSModulePath\
+$env:LOCALAPPDATA\PowerShell\ModuleCache/
+$env:PSModulePath/
+
+# Windows-specific paths in output
+D:/My Projects/
+G:/My Drive/My Projects/
+C:/Users/amir_/
+
+# Project local directories that shouldn't be committed
+.dclaude/
+.claude/
+Drive/
+Projects/
+data/
+functions/
+plugins/
+local/
