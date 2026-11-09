@@ -1,5 +1,9 @@
 # Windows 11 CVE Security Audit
 
+[![Security Policy](https://img.shields.io/badge/Security-Policy-blue)](SECURITY.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blue)](https://learn.microsoft.com/powershell)
+
 A portable read-only security audit tool and report for Windows 11 systems.
 
 ## What this audit checks
@@ -44,6 +48,32 @@ The script:
 - PowerShell 5.1+ (Windows default)
 - Internet access
 - No admin rights required (read-only)
+
+## Installation
+
+1. Clone or download this repository:
+   ```powershell
+   git clone https://github.com/amirhedayatikia/Windows-Security-Audit.git
+   cd Windows-Security-Audit
+   ```
+
+2. Run the audit:
+   ```powershell
+   powershell.exe -ExecutionPolicy Bypass -File win11-cve-audit.ps1
+   ```
+
+## Security Considerations
+
+This script is **read-only** and performs no system modifications:
+- Only reads local registry and system information
+- Only queries public, unauthenticated APIs
+- No data is collected or transmitted beyond the audit report
+
+See [SECURITY.md](SECURITY.md) for security best practices and vulnerability reporting.
+
+## Contributing
+
+We welcome contributions! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 

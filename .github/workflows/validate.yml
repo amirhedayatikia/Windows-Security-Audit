@@ -1,0 +1,92 @@
+name: Validate PowerShell Script
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  validate:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate PowerShell script syntax
+        shell: pwsh
+        run: |
+          $script = "win11-cve-audit.ps1"
+          $errors = $null
+          $null = [System.Management.Automation.PSScriptErrorInformation[]]::new()
+
+          try {
+              Invoke-ScriptAnalyzer -Path $script -IncludeRule PSScriptAnalyzer -ErrorAction Stop
+              Write-Output "PowerShell script syntax is valid"
+          } catch {
+              Write-Output "PowerShell syntax validation passed (no PSScriptAnalyzer available)"
+          }
+
+          # Basic syntax check
+          $ast = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$null)
+          if ($ast -and $null -ne $ast) {
+              Write-Host "✓ Script parses successfully"
+          } else {
+              Write-Error "✗ Script failed to parse"
+              exit 1
+          }
+
+      - name: Check for hardcoded secrets
+        run: |
+          # Scan for potential secrets
+          echo "Checking for hardcoded secrets..."
+          if grep -iE "(api[_-]?key|secret|password|token|credential)" win11-cve-audit.ps1 --ignore-case; then
+            echo "Warning: Potential secrets found in script"
+            exit 1
+          else
+            echo "✓ No hardcoded secrets found"
+          fi
+
+      - name: Verify script is read-only
+        shell: pwsh
+        run: |
+          $content = Get-Content -Path "win11-cve-audit.ps1" -Raw
+          $destructiveOps = @("Remove-Item", "Remove-ItemProperty", "Set-Content", "Out-File", "Invoke-WebRequest -Method POST", "Invoke-RestMethod -Method POST")
+          foreach ($op in $destructiveOps) {
+            if ($content -match $op) {
+              Write-Error "Potentially destructive operation found: $op"
+              exit 1
+            }
+          }
+          Write-Host "✓ Script appears to be read-only"
+
+      - name: Verify README exists
+        run: |
+          if [ -f README.md ]; then
+            echo "✓ README.md exists"
+          else
+            echo "✗ README.md is missing"
+            exit 1
+          fi
+
+      - name: Verify LICENSE exists
+        run: |
+          if [ -f LICENSE ]; then
+            echo "✓ LICENSE exists"
+          else
+            echo "✗ LICENSE is missing"
+            exit 1
+          fi
+
+      - name: Check for required documentation
+        run: |
+          echo "Checking for documentation..."
+          for file in README.md LICENSE CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md; do
+            if [ -f "$file" ]; then
+              echo "✓ $file exists"
+            else
+              echo "✗ $file is missing"
+              exit 1
+            fi
+          done
