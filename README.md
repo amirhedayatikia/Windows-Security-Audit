@@ -35,29 +35,13 @@ Test-SecurityFeatures
 $report = New-AuditReport -OutputPath ".\security-audit-report.md"
 ```
 
-### Claude Code Integration
-
-After installing the skill to `C:\Users\amir_\.claude\skills\`, use:
-
-```
-/skill:system-cve-audit
-```
-
-Which provides access to:
-- `Get-WindowsBuildInfo` — OS build and version details
-- `Get-LocalSoftwareInventory` — Installed software list
-- `Get-KevVulnerabilityStatus` — KEV vulnerability check
-- `Get-AppCveStatus` — Application CVE lookup
-- `Get-WingetUpdates` — Available package updates
-- `Test-SecurityFeatures` — BitLocker, TPM, Defender status
-- `New-AuditReport` — Generate full markdown report
-
 ## Output
 
 The audit generates a `security-audit-report.md` containing:
-- System Information (OS version, build, UBR)
-- Security Features Status (BitLocker, TPM, Defender, Firewall)
-- CISA KEV Vulnerability Coverage
+- System Information (OS version, build, UBR, install/boot dates)
+- Security Features Status (BitLocker, TPM, Secure Boot, Defender, Firewall)
+- Installed Applications (registry inventory)
+- CISA KEV Coverage - every Windows KEV entry from the 12 months before the audit date, with per-CVE status: PATCHED / PATCHED (inherited) / VULNERABLE / NOT AFFECTED / UNKNOWN, plus the fixing KB and build
 - Available winget Updates
 
 ## Project Structure
@@ -68,6 +52,7 @@ Windows-Security-Audit/
 ├── win11-cve-audit.psm1     # PowerShell module manifest
 ├── win11-cve-audit.psd1     # Module definition file
 ├── functions/               # Modular PowerShell functions
+│   ├── 0.Invoke-AuditRestMethod.ps1
 │   ├── 1.Get-WindowsBuildInfo.ps1
 │   ├── 2.Get-LocalSoftwareInventory.ps1
 │   ├── 3.Get-KevVulnerabilityStatus.ps1
