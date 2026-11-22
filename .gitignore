@@ -55,6 +55,5 @@ $env:PSModulePath/
 Drive/
 Projects/
 data/
-functions/
 plugins/
 local/
