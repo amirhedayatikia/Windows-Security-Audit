@@ -25,7 +25,8 @@ jobs:
       - name: Lint PowerShell module and function files
         shell: pwsh
         run: |
-          $results = Invoke-ScriptAnalyzer -Path win11-cve-audit.psm1 -Severity Error,Warning
+          $results = @()
+          $results += Invoke-ScriptAnalyzer -Path win11-cve-audit.psm1 -Severity Error,Warning
           if (Test-Path functions) {
             $results += Invoke-ScriptAnalyzer -Path functions -Recurse -Severity Error,Warning
           }
