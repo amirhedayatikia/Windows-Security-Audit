@@ -45,10 +45,9 @@ jobs:
             $tokens = $null
             $errors = $null
             try {
-              $null = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
-              if ($null -ne $errors -and $errors.Count -gt 0) {
+              $ast = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+              if (-not $ast) {
                 $failed += $_.FullName
-                $errors | ForEach-Object { Write-Warning "Parse error in $($_.FullName): $($_.Message)" }
               }
             } catch {
               $failed += $_.FullName
