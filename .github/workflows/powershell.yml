@@ -121,6 +121,7 @@ jobs:
           Write-Host "✓ No hardcoded secrets detected"
 
       - name: Verify required documentation
+        shell: bash
         run: |
           for file in README.md LICENSE CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md; do
             if [ -f "$file" ]; then
