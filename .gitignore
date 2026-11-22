@@ -9,7 +9,7 @@ $RECYCLE.BIN/
 *.cdxml
 *.pdb
 *.log
-*.ps1
+# *.ps1 - tracked in repo
 
 # IDE/Editor files
 .idea/
