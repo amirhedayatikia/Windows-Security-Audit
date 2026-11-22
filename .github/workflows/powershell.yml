@@ -1,0 +1,126 @@
+name: PowerShell CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  lint-and-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction SilentlyContinue
+          if (-not (Get-Command Invoke-ScriptAnalyzer -ErrorAction SilentlyContinue)) {
+            Write-Error "PSScriptAnalyzer installation failed"
+            exit 1
+          }
+
+      - name: Lint PowerShell scripts
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error,Warning
+          if ($results) {
+            $results | Format-Table RuleName, Severity, File, Line, Message -AutoSize | Out-String -Width 200 | Write-Host
+            Write-Error "Linting failed with $($results.Count) issue(s)"
+            exit 1
+          }
+          Write-Host "✓ All PowerShell files pass linting"
+
+      - name: Syntax validation
+        shell: pwsh
+        run: |
+          $failed = @()
+          Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 | ForEach-Object {
+            try {
+              $ast = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null)
+              if (-not $ast) {
+                $failed += $_.FullName
+              }
+            } catch {
+              $failed += $_.FullName
+              Write-Warning "Parse error in $($_.FullName): $($_.Exception.Message)"
+            }
+          }
+          if ($failed) {
+            Write-Error "Syntax validation failed for: $($failed -join ', ')"
+            exit 1
+          }
+          Write-Host "✓ All scripts parse successfully"
+
+      - name: Verify read-only operations
+        shell: pwsh
+        run: |
+          $content = Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 | ForEach-Object { Get-Content $_.FullName -Raw }
+          $destructiveOps = @(
+            "Remove-Item",
+            "Remove-ItemProperty",
+            "Set-Content",
+            "Out-File",
+            "Invoke-WebRequest\s+-Method\s+POST",
+            "Invoke-RestMethod\s+-Method\s+POST",
+            "Invoke-WebRequest\s+-Method\s+PUT",
+            "Invoke-RestMethod\s+-Method\s+PUT",
+            "Invoke-WebRequest\s+-Method\s+DELETE",
+            "Invoke-RestMethod\s+-Method\s+DELETE"
+          )
+          $found = @()
+          foreach ($op in $destructiveOps) {
+            if ($content -match $op) {
+              $found += $op
+            }
+          }
+          if ($found) {
+            Write-Warning "Potentially destructive operations detected (review required):"
+            $found | ForEach-Object { Write-Warning "  $_" }
+            # Not failing - these could be in comments or conditional blocks
+          } else {
+            Write-Host "✓ No obvious destructive operations"
+          }
+
+      - name: Check for hardcoded secrets
+        shell: pwsh
+        run: |
+          $patterns = @(
+            "api[_-]?key",
+            "secret",
+            "password",
+            "token",
+            "credential",
+            "apikey",
+            "access[_-]?key",
+            "private[_-]?key"
+          )
+          $found = @()
+          Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 -Filter *.psd1 | ForEach-Object {
+            $file = $_.FullName
+            $text = Get-Content $file -Raw
+            foreach ($pattern in $patterns) {
+              if ($text -match "(?i)$pattern\s*[=:]\s*['\"].+['\"]") {
+                $found += "$file: potential $pattern"
+              }
+            }
+          }
+          if ($found) {
+            Write-Error "Potential hardcoded secrets found:"
+            $found | ForEach-Object { Write-Error "  $_" }
+            exit 1
+          }
+          Write-Host "✓ No hardcoded secrets detected"
+
+      - name: Verify required documentation
+        run: |
+          for file in README.md LICENSE CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md; do
+            if [ -f "$file" ]; then
+              echo "✓ $file exists"
+            else
+              echo "✗ $file is missing"
+              exit 1
+            fi
+          done
