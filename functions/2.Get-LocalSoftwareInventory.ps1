@@ -25,7 +25,7 @@ function Get-LocalSoftwareInventory {
                 $apps += [PSCustomObject]@{Name=$name; Version=$version; Publisher='Unknown'; Source='winget'}
             }
         }
-    } catch { }
+    } catch { Write-Error $_ }
 
     $apps | Sort-Object Name -Unique
 }
