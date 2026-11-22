@@ -109,7 +109,7 @@ jobs:
             $text = Get-Content $file -Raw
             foreach ($pattern in $patterns) {
               if ($text -match "(?i)$pattern\s*[=:]\s*\S") {
-                $found += "$file: potential $pattern"
+                $found += "${file}: potential ${pattern}"
               }
             }
           }
