@@ -31,7 +31,7 @@ jobs:
             $results += Invoke-ScriptAnalyzer -Path functions -Recurse -Severity Error,Warning
           }
           if ($results) {
-            $results | Format-Table RuleName, Severity, File, Line, Message -AutoSize | Out-String -Width 200 | Write-Host
+            $results | Select-Object RuleName, Severity, File, Line, Message | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
             Write-Error "Linting failed with $($results.Count) issue(s)"
             exit 1
           }
