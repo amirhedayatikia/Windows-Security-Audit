@@ -41,7 +41,7 @@ jobs:
         shell: pwsh
         run: |
           $failed = @()
-          Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 | Where-Object { $_.Name -ne 'win11-cve-audit.ps1' } | ForEach-Object {
+          Get-ChildItem . -Recurse -Include *.ps1,*.psm1 | Where-Object { $_.Name -ne 'win11-cve-audit.ps1' } | ForEach-Object {
             try {
               $ast = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null)
               if (-not $ast) {
@@ -61,7 +61,7 @@ jobs:
       - name: Verify read-only operations
         shell: pwsh
         run: |
-          $content = Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 | Where-Object { $_.Name -ne 'win11-cve-audit.ps1' } | ForEach-Object { Get-Content $_.FullName -Raw }
+          $content = Get-ChildItem . -Recurse -Include *.ps1,*.psm1 | Where-Object { $_.Name -ne 'win11-cve-audit.ps1' } | ForEach-Object { Get-Content $_.FullName -Raw }
           $destructiveOps = @(
             "Remove-Item",
             "Remove-ItemProperty",
