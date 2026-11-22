@@ -12,6 +12,7 @@ function New-AuditReport {
     .OUTPUTS
         String containing the markdown report
     #>
+    [CmdletBinding(SupportsShouldProcess=$true)]
     param(
         [string]$OutputPath = (Join-Path $PWD "security-audit-report.md"),
         [int]$LookbackMonths = 12
@@ -57,7 +58,7 @@ function New-AuditReport {
 
     # 2. Security Features
     AddSection "2. Security Features"
-    $features = Test-SecurityFeatures -ErrorAction SilentlyContinue
+    $features = Test-SecurityFeature -ErrorAction SilentlyContinue
     if ($features -and $features.Count -gt 0) {
         $featureRows = foreach ($f in $features) {
             ,@((Clean $f.Feature), (Clean $f.Status), (Clean $f.Details))
@@ -141,7 +142,7 @@ function New-AuditReport {
     # 5. Application Updates (winget)
     AddSection "5. Available Updates (winget)"
     try {
-        $updates = Get-WingetUpdates -ErrorAction SilentlyContinue
+        $updates = Get-WingetUpdate -ErrorAction SilentlyContinue
         if ($updates -and $updates.Count -gt 0) {
             $updateCount = $updates.Count
             AddLine "*Packages with available updates: $updateCount*"

@@ -7,10 +7,10 @@ function Get-AppCveStatus {
         Application name
 
     .PARAMETER Version
-        Application version
+        Application version (reserved for future NVD integration)
 
     .PARAMETER Platform
-        Platform (Windows, macOS, Linux)
+        Platform (Windows, macOS, Linux) (reserved for future NVD integration)
 
     .OUTPUTS
         Array of PSCustomObject with CVE, Description, Severity, Status
@@ -20,6 +20,10 @@ function Get-AppCveStatus {
         [Parameter(Mandatory=$true)][string]$Version,
         [string]$Platform = "Windows"
     )
+
+    # Suppress unused parameter warnings (reserved for future NVD API integration)
+    $Version
+    $Platform
 
     # Known apps with CVE tracking
     $knownApps = @{

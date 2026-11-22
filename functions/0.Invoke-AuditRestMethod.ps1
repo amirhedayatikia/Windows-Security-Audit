@@ -42,6 +42,7 @@ function Invoke-AuditRestMethod {
             throw
         }
         $directError = $_
+        # Intentionally continue to fallback; directError surfaces the original error if fallback also fails
     } finally {
         [System.Net.WebRequest]::DefaultWebProxy = $oldProxy
     }
