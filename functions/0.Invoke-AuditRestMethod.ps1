@@ -44,8 +44,7 @@ function Invoke-AuditRestMethod {
         $directError = $_
         # Intentionally continue to fallback; directError surfaces the original error if fallback also fails
         # Non-empty catch block to satisfy PSScriptAnalyzer
-        $null = $directError
-        $null = $true
+        $directError | Out-Null
     } finally {
         [System.Net.WebRequest]::DefaultWebProxy = $oldProxy
     }
