@@ -25,8 +25,10 @@ jobs:
       - name: Lint PowerShell module and function files
         shell: pwsh
         run: |
-          $results = Invoke-ScriptAnalyzer -Path win11-cve-audit.psm1 -Recurse -Severity Error,Warning
-          $results += Invoke-ScriptAnalyzer -Path functions -Recurse -Severity Error,Warning
+          $results = Invoke-ScriptAnalyzer -Path win11-cve-audit.psm1 -Severity Error,Warning
+          if (Test-Path functions) {
+            $results += Invoke-ScriptAnalyzer -Path functions -Recurse -Severity Error,Warning
+          }
           if ($results) {
             $results | Format-Table RuleName, Severity, File, Line, Message -AutoSize | Out-String -Width 200 | Write-Host
             Write-Error "Linting failed with $($results.Count) issue(s)"
