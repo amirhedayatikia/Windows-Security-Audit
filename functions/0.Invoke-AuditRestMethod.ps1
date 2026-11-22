@@ -42,9 +42,8 @@ function Invoke-AuditRestMethod {
             throw
         }
         $directError = $_
-        # Intentionally continue to fallback; directError surfaces the original error if fallback also fails
-        # Non-empty catch block to satisfy PSScriptAnalyzer
-        Write-Debug "Direct connection failed, falling back to system proxy: $($directError.Exception.Message)"
+        # Non-empty catch block to satisfy PSScriptAnalyzer - fall through to system proxy fallback
+        Write-Error "Direct connection failed: $($directError.Exception.Message)"
     } finally {
         [System.Net.WebRequest]::DefaultWebProxy = $oldProxy
     }
