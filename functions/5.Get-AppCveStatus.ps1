@@ -49,7 +49,7 @@ function Get-AppCveStatus {
         # Try to search NVD for unknown apps
         $searchQuery = "$Name isan"
         $nvdUrl = "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=$($searchQuery -replace ' ','+')"
-        $result = try {
+        try {
             Invoke-RestMethod -Uri $nvdUrl -TimeoutSec 30 -Headers @{ "User-Agent" = "win11-cve-audit/1.0" }
         } catch { $null }
     }
