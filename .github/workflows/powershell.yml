@@ -104,11 +104,11 @@ jobs:
             "private[_-]?key"
           )
           $found = @()
-          Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 -Filter *.psd1 | Where-Object { $_.Name -ne 'win11-cve-audit.ps1' } | ForEach-Object {
+          Get-ChildItem . -Recurse -Include *.ps1,*.psm1,*.psd1 | Where-Object { $_.Name -ne 'win11-cve-audit.ps1' } | ForEach-Object {
             $file = $_.FullName
             $text = Get-Content $file -Raw
             foreach ($pattern in $patterns) {
-              if ($text -match "(?i)$pattern\s*[=:]\s*['\"].+['\"]") {
+              if ($text -match "(?i)$pattern\s*[=:]\s*\S") {
                 $found += "$file: potential $pattern"
               }
             }
