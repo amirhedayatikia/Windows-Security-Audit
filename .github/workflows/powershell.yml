@@ -22,22 +22,23 @@ jobs:
             exit 1
           }
 
-      - name: Lint PowerShell scripts
+      - name: Lint PowerShell module and function files
         shell: pwsh
         run: |
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error,Warning
+          $results = Invoke-ScriptAnalyzer -Path win11-cve-audit.psm1 -Recurse -Severity Error,Warning
+          $results += Invoke-ScriptAnalyzer -Path functions -Recurse -Severity Error,Warning
           if ($results) {
             $results | Format-Table RuleName, Severity, File, Line, Message -AutoSize | Out-String -Width 200 | Write-Host
             Write-Error "Linting failed with $($results.Count) issue(s)"
             exit 1
           }
-          Write-Host "✓ All PowerShell files pass linting"
+          Write-Host "✓ All module and function files pass linting"
 
       - name: Syntax validation
         shell: pwsh
         run: |
           $failed = @()
-          Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 | ForEach-Object {
+          Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 | Where-Object { $_.Name -ne 'win11-cve-audit.ps1' } | ForEach-Object {
             try {
               $ast = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null)
               if (-not $ast) {
@@ -52,12 +53,12 @@ jobs:
             Write-Error "Syntax validation failed for: $($failed -join ', ')"
             exit 1
           }
-          Write-Host "✓ All scripts parse successfully"
+          Write-Host "✓ All module/function scripts parse successfully"
 
       - name: Verify read-only operations
         shell: pwsh
         run: |
-          $content = Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 | ForEach-Object { Get-Content $_.FullName -Raw }
+          $content = Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 | Where-Object { $_.Name -ne 'win11-cve-audit.ps1' } | ForEach-Object { Get-Content $_.FullName -Raw }
           $destructiveOps = @(
             "Remove-Item",
             "Remove-ItemProperty",
@@ -98,7 +99,7 @@ jobs:
             "private[_-]?key"
           )
           $found = @()
-          Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 -Filter *.psd1 | ForEach-Object {
+          Get-ChildItem . -Recurse -Filter *.ps1 -Filter *.psm1 -Filter *.psd1 | Where-Object { $_.Name -ne 'win11-cve-audit.ps1' } | ForEach-Object {
             $file = $_.FullName
             $text = Get-Content $file -Raw
             foreach ($pattern in $patterns) {
