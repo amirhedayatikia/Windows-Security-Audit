@@ -51,7 +51,7 @@ function Get-AppCveStatus {
         $nvdUrl = "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=$($searchQuery -replace ' ','+')"
         try {
             Invoke-RestMethod -Uri $nvdUrl -TimeoutSec 30 -Headers @{ "User-Agent" = "win11-cve-audit/1.0" }
-        } catch { $null }
+        } catch { Write-Error $_ }
     }
 
     # Simplified CVE check for known apps

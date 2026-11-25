@@ -1,9 +1,6 @@
 Describe 'ConvertFrom-WingetUpgradeOutput' {
-    BeforeAll {
-        Import-Module "G:\My Drive\My-Projects\Windows-Security-Audit\functions\6.Get-WingetUpdate.ps1" -Force -ErrorAction Stop
-    }
-
     It 'Distinguishes a successful zero-update scan' {
+        . "G:\My Drive\My-Projects\Windows-Security-Audit\functions\6.Get-WingetUpdate.ps1"
         $output = @(
             'Name             Id               Version Available Source',
             '-----------------------------------------------------------',
@@ -16,6 +13,7 @@ Describe 'ConvertFrom-WingetUpgradeOutput' {
     }
 
     It 'Returns available updates from valid output' {
+        . "G:\My Drive\My-Projects\Windows-Security-Audit\functions\6.Get-WingetUpdate.ps1"
         $output = @(
             'Name             Id               Version Available Source',
             '-----------------------------------------------------------',
@@ -31,17 +29,19 @@ Describe 'ConvertFrom-WingetUpgradeOutput' {
     }
 
     It 'Returns ParseError for empty output' {
+        . "G:\My Drive\My-Projects\Windows-Security-Audit\functions\6.Get-WingetUpdate.ps1"
         $result = ConvertFrom-WingetUpgradeOutput -Output @() -Stderr $null -ExitCode 0
         $result.Status | Should Not Be 'NoUpdates'
         $result.Status | Should Be 'ParseError'
     }
 
     It 'Multi-word package names parse correctly' {
+        . "G:\My Drive\My-Projects\Windows-Security-Audit\functions\6.Get-WingetUpdate.ps1"
         $output = @(
             'Name             Id               Version Available Source',
             '-----------------------------------------------------------',
             'Microsoft Edge   Microsoft.Edge   1.0     2.0       winget',
-            'Visual Studio Code  Microsoft.VisualStudio.Code 1.1  1.2 winget'
+            'Visual Studio Code  Microsoft.VisualStudio.Code   1.1    1.2    winget'
         )
         $result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
         $result.Status | Should Be 'UpdatesAvailable'
@@ -51,6 +51,7 @@ Describe 'ConvertFrom-WingetUpgradeOutput' {
     }
 
     It 'Returns SourceError when output indicates source failure' {
+        . "G:\My Drive\My-Projects\Windows-Security-Audit\functions\6.Get-WingetUpdate.ps1"
         $output = @(
             'Error: Package source is unavailable',
             'Please check your network connection.'
@@ -61,6 +62,7 @@ Describe 'ConvertFrom-WingetUpgradeOutput' {
     }
 
     It 'Returns ParseError for unrecognized successful output' {
+        . "G:\My Drive\My-Projects\Windows-Security-Audit\functions\6.Get-WingetUpdate.ps1"
         $output = @(
             'Some unexpected successful output',
             'Without known headers'
@@ -72,11 +74,8 @@ Describe 'ConvertFrom-WingetUpgradeOutput' {
 }
 
 Describe 'Get-WingetUpdate availability check' {
-    BeforeAll {
-        Import-Module "G:\My Drive\My-Projects\Windows-Security-Audit\functions\6.Get-WingetUpdate.ps1" -Force -ErrorAction Stop
-    }
-
     It 'Returns Unavailable when winget executable is missing' {
+        . "G:\My Drive\My-Projects\Windows-Security-Audit\functions\6.Get-WingetUpdate.ps1"
         $result = Get-WingetUpdate -WinGetPath 'C:\Not\Exist\winget.exe'
         $result.Status | Should Be 'Unavailable'
         $result.Items.Count | Should Be 0

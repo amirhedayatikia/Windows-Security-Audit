@@ -131,3 +131,21 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Install-Module Pester -Force -Scope CurrentUser -ErrorAction SilentlyContinue
+          if (-not (Get-Module -ListAvailable -Name Pester | Where-Object { $_.Version.Major -ge 5 })) {
+            Write-Error "Pester 5+ installation failed"
+            exit 1
+          }
+
+      - name: Run regression tests
+        shell: pwsh
+        run: |
+          $result = & "$env:GITHUB_WORKSPACE/tests\Run-Tests.ps1"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Regression tests failed"
+            exit 1
+          }

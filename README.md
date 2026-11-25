@@ -58,9 +58,11 @@ Windows-Security-Audit/
 │   ├── 3.Get-KevVulnerabilityStatus.ps1
 │   ├── 4.Compare-Version.ps1
 │   ├── 5.Get-AppCveStatus.ps1
-│   ├── 6.Get-WingetUpdates.ps1
-│   ├── 7.Test-SecurityFeatures.ps1
+│   ├── 6.Get-WingetUpdate.ps1
+│   ├── 7.Test-SecurityFeature.ps1
 │   └── 8.New-AuditReport.ps1
+├── tests/                   # Pester regression tests
+│   └── WinGet.Tests.ps1
 ├── .github/workflows/       # CI/CD validation
 ├── SECURITY.md
 └── README.md
@@ -81,6 +83,7 @@ Windows-Security-Audit/
 - PowerShell 5.1+ (built into Windows 11)
 - Internet access
 - No admin rights required (read-only)
+- Pester 5+ (optional, for regression tests: `Install-Module -Name Pester -Force -Scope CurrentUser`)
 
 ## Installation
 
