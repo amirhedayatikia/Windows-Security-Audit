@@ -11,7 +11,7 @@ A portable, read-only security audit tool and report generator for Windows 11 sy
 1. **Local software inventory** — Installed applications from registry and winget
 2. **Microsoft CVE coverage** — CISA KEV catalog cross-reference vs your Windows build
 3. **Microsoft Security Updates** — Patch status for known exploited vulnerabilities
-4. **Available updates** — winget upgrades, pending Windows Updates
+4. **Available updates** — winget upgrades
 
 ## Usage
 
@@ -29,7 +29,7 @@ Import-Module win11-cve-audit
 # Get specific info
 Get-WindowsBuildInfo
 Get-LocalSoftwareInventory
-Test-SecurityFeatures
+Test-SecurityFeature
 
 # Full audit report
 $report = New-AuditReport -OutputPath ".\security-audit-report.md"

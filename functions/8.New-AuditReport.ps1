@@ -108,6 +108,7 @@ function New-AuditReport {
             if ($count -gt 0) {
                 $kevRows = foreach ($k in $kevStatus) {
                     $statusCell = if ($k.Status -like 'VULNERABLE*') { "**$($k.Status)**" } else { $k.Status }
+                    $confCell = if ($k.Status -like 'VULNERABLE*' -or $k.Status -like 'UNKNOWN*') { "**$($k.Confidence)**" } else { $k.Confidence }
                     ,@(
                         (Clean $k.CVE),
                         (Clean $k.Title),
@@ -116,11 +117,12 @@ function New-AuditReport {
                         (Clean $k.Severity),
                         (Clean $k.Ransomware),
                         $statusCell,
+                        $confCell,
                         (Clean $k.FixedBuild),
                         (Clean $k.KB)
                     )
                 }
-                AddTable @("CVE","Title","Date Added","CVSS","Severity","Ransomware","Status","Fixed Build","KB") $kevRows
+                AddTable @("CVE","Title","Date Added","CVSS","Severity","Ransomware","Status","Confidence","Fixed Build","KB") $kevRows
             } else {
                 AddLine "No Microsoft Windows KEV entries were added in the lookback window."
             }
@@ -130,7 +132,8 @@ function New-AuditReport {
             AddLine "- PATCHED (inherited) - MSRC no longer lists this build line (it shipped after the fix), but the sibling build on the same servicing branch was fixed at an earlier UBR, which the installed cumulative update covers."
             AddLine "- VULNERABLE / VULNERABLE (inherited) - the installed UBR is below the fixed build; install the listed KB (cumulative updates include earlier fixes)."
             AddLine "- NOT AFFECTED - MSRC lists affected products for this CVE, but none on this system's build line."
-            AddLine "- UNKNOWN - the CVE is not in the MSRC catalog (typically legacy CVEs); verify patch status manually."
+            AddLine "- UNKNOWN - evidence insufficient to determine patch status (legacy CVE absent from MSRC, or no fix build metadata available)."
+            AddLine "- Confidence: High = direct MSRC fix metadata; Medium = inherited from sibling servicing family; Low = limited or no MSRC metadata."
         } catch {
             AddLine "*Error checking KEV vulnerabilities: $(Clean $_.Exception.Message)*"
         }
