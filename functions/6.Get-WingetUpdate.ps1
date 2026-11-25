@@ -33,6 +33,8 @@ function Invoke-WingetProcess {
         Remove-Item $outputFile -ErrorAction SilentlyContinue
         Remove-Item $errorFile  -ErrorAction SilentlyContinue
     } catch {
+        # Surface the error and return failure result
+        Write-Error "winget process failed: $($_.Exception.Message)"
         return [PSCustomObject]@{
             ExitCode        = $null
             StandardOutput  = $null
@@ -76,6 +78,10 @@ function ConvertFrom-WingetUpgradeOutput {
         [string]$Stderr,
         [int]$ExitCode
     )
+
+    # ExitCode is reserved for future use when distinguishing exit-code-based
+    # failures from source/parse failures
+    $null = $ExitCode
 
     $now = Get-Date
 
@@ -183,11 +189,11 @@ function ConvertFrom-WingetUpgradeOutput {
 
         if ($tokens.Count -lt 4) { continue }
 
-        $source   = $tokens[-1]
         $available = $tokens[-2]
         $version   = $tokens[-3]
         $id        = $tokens[-4]
         $name      = $tokens[0..($tokens.Count - 5)] -join ' '
+        # $source not used; Source column is hardcoded to 'winget'
 
         if (-not $id -or -not $version -or -not $available) { continue }
 
