@@ -43,6 +43,13 @@ sandbox-audit-report.md
 $env:LOCALAPPDATA\PowerShell\ModuleCache/
 $env:PSModulePath/
 
+# Regression tests - kept locally, not pushed to public repo
+tests/
+
+# Project working documents - local only
+MODIFICATION-PLAN.md
+Review-24-11.md
+
 # Windows-specific paths in output (sanitized, no username or drive letters)
 # Lines that may contain local paths in generated reports
 *My Projects*/
