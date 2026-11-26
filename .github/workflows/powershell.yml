@@ -135,4 +135,21 @@ jobs:
             fi
           done
 
+      - name: Run Pester unit tests
+        shell: pwsh
+        run: |
+          if (Test-Path tests) {
+            Write-Host "Installing Pester..."
+            Install-Module Pester -Force -Scope CurrentUser -ErrorAction SilentlyContinue
+            $testResults = Invoke-Pester -Script @{ Path = 'tests\Verify-P01.ps1'; Parameters = @{} } -Output Detailed
+            $testResults += Invoke-Pester -Script @{ Path = 'tests\Verify-Winget.ps1'; Parameters = @{} } -Output Detailed
+            if ($testResults.FailedCount -gt 0) {
+              Write-Error "Pester tests failed: $($testResults.FailedCount) of $($testResults.TotalCount)"
+              exit 1
+            }
+            Write-Host "✓ All Pester tests passed ($($testResults.PassedCount)/$($testResults.TotalCount))"
+          } else {
+            Write-Warning "No tests directory found, skipping Pester tests"
+          }
+
       
