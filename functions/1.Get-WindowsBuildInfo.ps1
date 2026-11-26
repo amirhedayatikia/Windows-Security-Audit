@@ -22,7 +22,7 @@ function Get-WindowsBuildInfo {
             $osEdition = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
             $edition = $osEdition.OSProductSuite
         } catch {
-            # Best effort - edition not critical
+            Write-Warning "Unable to retrieve Windows edition: $($_.Exception.Message)"
         }
 
         # Get architecture
@@ -39,7 +39,7 @@ function Get-WindowsBuildInfo {
                 default { "Unknown ($($procArch.Architecture))" }
             }
         } catch {
-            # Best effort
+            Write-Warning "Unable to retrieve processor architecture: $($_.Exception.Message)"
         }
 
         [PSCustomObject]@{

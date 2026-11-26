@@ -23,7 +23,7 @@ function Invoke-WingetProcess {
 
     try {
         $process = Start-Process -FilePath $WinGetPath `
-            -ArgumentList @('upgrade','--disable-interactivity','--quiet') `
+            -ArgumentList @('upgrade','--disable-interactivity') `
             -NoNewWindow -PassThru -Wait `
             -RedirectStandardOutput $outputFile `
             -RedirectStandardError $errorFile 2>$null
@@ -100,6 +100,21 @@ function ConvertFrom-WingetUpgradeOutput {
             Error          = $Stderr
             Timestamp      = $now
             Confidence     = 'Medium'
+            Source         = 'winget'
+        }
+    }
+
+    # winget outputs "No installed package found matching input criteria." when
+    # there are no upgradeable packages in the current scope/source. Treat this
+    # as a successful zero-update scan, not a parse error.
+    if ($Output -match 'No installed package found matching input criteria') {
+        return [PSCustomObject]@{
+            Status         = 'NoUpdates'
+            Items          = @()
+            Reason         = 'No winget packages have available upgrades'
+            Error          = $null
+            Timestamp      = $now
+            Confidence     = 'High'
             Source         = 'winget'
         }
     }
