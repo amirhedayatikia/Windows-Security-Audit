@@ -37,8 +37,7 @@ function Invoke-AuditRestMethod {
         return Invoke-RestMethod -Uri $Uri -TimeoutSec $TimeoutSec -UserAgent "win11-cve-audit/1.0"
     } catch {
         # 404 means the resource does not exist; no point retrying via proxy
-        $resp = $_.Exception.Response
-        if ($resp -and $resp.StatusCode -eq [System.Net.HttpStatusCode]::NotFound) {
+        if ($_.Exception.Response -and $_.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::NotFound) {
             throw
         }
         # Fall through to system proxy fallback
@@ -52,6 +51,6 @@ function Invoke-AuditRestMethod {
         return Invoke-RestMethod -Uri $Uri -TimeoutSec $TimeoutSec -UserAgent "win11-cve-audit/1.0"
     } catch {
         # Surface the direct error - it is usually the more meaningful one
-        throw $directError
+        throw $_
     }
 }
