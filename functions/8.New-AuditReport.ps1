@@ -60,10 +60,27 @@ function New-AuditReport {
     AddSection "2. Security Features"
     $features = Test-SecurityFeature -ErrorAction SilentlyContinue
     if ($features -and $features.Count -gt 0) {
+        $pass   = @($features | Where-Object Status -eq 'PASS').Count
+        $fail   = @($features | Where-Object Status -eq 'FAIL').Count
+        $errCnt = @($features | Where-Object Status -eq 'ERROR').Count
+        $unknown= @($features | Where-Object Status -eq 'UNKNOWN').Count
+        $na     = @($features | Where-Object Status -eq 'NOT APPLICABLE').Count
+        AddLine "*Security checks: $pass PASS / $fail FAIL / $errCnt ERROR / $unknown UNKNOWN / $na NOT APPLICABLE*"
+        AddBlank
         $featureRows = foreach ($f in $features) {
-            ,@((Clean $f.Feature), (Clean $f.Status), (Clean $f.Details))
+            $statusCell = if ($f.Status -eq 'FAIL') { "**$($f.Status)**" } elseif ($f.Status -eq 'ERROR') { "**$($f.Status)**" } elseif ($f.Status -eq 'UNKNOWN') { "**$($f.Status)**" } else { $f.Status }
+            ,@((Clean $f.Name), $statusCell, (Clean $f.Summary), (Clean $f.Reason))
         }
-        AddTable @("Feature","Status","Details") $featureRows
+        AddTable @("Check","Status","Summary","Reason") $featureRows
+        AddBlank
+        AddLine "**Evidence details:**"
+        foreach ($f in $features) {
+            AddLine "- **$($f.Name)** [$($f.Status)]: $($f.Reason)"
+            if ($f.Evidence -and $f.Evidence.Count -gt 0) {
+                foreach ($e in $f.Evidence) { AddLine "  - $e" }
+            }
+            if ($f.Error) { AddLine "  - *Error: $($f.Error)*" }
+        }
     } else {
         AddLine "*Unable to retrieve security features information*"
     }
@@ -163,6 +180,37 @@ function New-AuditReport {
         }
     } catch {
         AddLine "*Could not check for winget updates: $(Clean $_.Exception.Message)*"
+    }
+    AddBlank
+
+    # 6. Pending Windows Updates
+    AddSection "6. Pending Windows Updates"
+    try {
+        $wu = Get-PendingWindowsUpdate -ErrorAction SilentlyContinue
+        if ($wu.Status -eq 'AFFECTED') {
+            AddLine "*$($wu.Items.Count) applicable update(s) pending installation*"
+            AddBlank
+            $wuRows = foreach ($u in $wu.Items) {
+                $kb = if ($u.KB -and $u.KB -ne 'N/A') { $u.KB } else { 'N/A' }
+                $size = if ($u.SizeMB -and $u.SizeMB -gt 0) { "$($u.SizeMB) MB" } else { 'N/A' }
+                ,@((Clean $u.Title), $kb, (Clean $u.Category), (Clean $u.Severity), $size)
+            }
+            AddTable @("Title","KB","Category","Severity","Download Size") $wuRows
+            AddBlank
+        } elseif ($wu.Status -eq 'NOT AFFECTED') {
+            AddLine "*No applicable Windows Updates pending installation*"
+            AddBlank
+        } else {
+            AddLine "*Windows Update assessment incomplete: $($wu.Status). $($wu.Reason)*"
+            if ($wu.Error) { AddLine "*Details: $(Clean $wu.Error)*" }
+            AddBlank
+        }
+        if ($wu.PendingReboot) {
+            AddLine "**Pending reboot required** - Windows Update Agent reports a reboot is needed to complete installation."
+            AddBlank
+        }
+    } catch {
+        AddLine "*Could not check for pending Windows Updates: $(Clean $_.Exception.Message)*"
     }
     AddBlank
 
