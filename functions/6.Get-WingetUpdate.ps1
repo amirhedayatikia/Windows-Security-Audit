@@ -33,12 +33,13 @@ function Invoke-WingetProcess {
         Remove-Item $outputFile -ErrorAction SilentlyContinue
         Remove-Item $errorFile  -ErrorAction SilentlyContinue
     } catch {
+        $errorRecord = $Error[0]
         # Surface the error and return failure result
-        Write-Error "winget process failed: $($_.Exception.Message)"
+        Write-Error "winget process failed: $($errorRecord.Exception.Message)"
         return [PSCustomObject]@{
             ExitCode        = $null
             StandardOutput  = $null
-            StandardError   = $_.Exception.Message
+            StandardError   = $errorRecord.Exception.Message
             ProcessFailed   = $true
         }
     }
