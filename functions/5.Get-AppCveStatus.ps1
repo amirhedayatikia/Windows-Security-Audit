@@ -2,18 +2,21 @@ function Get-AppCveStatus {
     <#
     .SYNOPSIS
         Checks if a specific application version has known CVEs.
+        Currently returns NOT ASSESSED - application vulnerability correlation requires
+        reliable package identity mapping (CPE), version normalization, and authoritative
+        vulnerability feeds (NVD, vendor advisories). This is reserved for future implementation.
 
     .PARAMETER Name
         Application name
 
     .PARAMETER Version
-        Application version (reserved for future NVD integration)
+        Application version
 
     .PARAMETER Platform
-        Platform (Windows, macOS, Linux) (reserved for future NVD integration)
+        Platform (Windows, macOS, Linux)
 
     .OUTPUTS
-        Array of PSCustomObject with CVE, Description, Severity, Status
+        PSCustomObject with CheckId, Name, Status, Reason, Evidence, Source, Timestamp, Confidence, Items
     #>
     param(
         [Parameter(Mandatory=$true)][string]$Name,
@@ -21,53 +24,20 @@ function Get-AppCveStatus {
         [string]$Platform = "Windows"
     )
 
-    # Suppress unused parameter warnings (reserved for future NVD API integration)
-    $Version
-    $Platform
-
-    # Known apps with CVE tracking
-    $knownApps = @{
-        "Visual Studio Code" = @{
-            NvdSearch = "Visual Studio Code isanext generation of Visual Studio"
-            CvePrefix = "CVE-2025-"
-        }
-        "Chrome" = @{
-            NvdSearch = "Google Chrome isanext-generation web browser"
-            CvePrefix = "CVE-2025-"
-        }
-        "WinSCP" = @{
-            NvdSearch = "WinSCP isanopen-source SFTP, FTP, SFTPS, FTPS, WebDAV client"
-            CvePrefix = "CVE-2025-"
-        }
-        "VLC" = @{
-            NvdSearch = "VideoLAN VLC media player"
-            CvePrefix = "CVE-2025-"
-        }
+    return [PSCustomObject]@{
+        CheckId    = "APP-CVE-$([guid]::NewGuid().ToString().Substring(0,8))"
+        Name       = $Name
+        Version    = $Version
+        Platform   = $Platform
+        Status     = "NOT ASSESSED"
+        Severity   = "Informational"
+        Summary    = "Application CVE correlation not implemented"
+        Reason     = "Reliable vulnerability assessment requires: (1) CPE/package identity mapping from WinGet ID/publisher to NVD vendor/product, (2) version normalization per ecosystem, (3) authoritative feed queries (NVD, CISA KEV, vendor advisories) with rate-limit handling and freshness metadata. Current implementation avoids false precision."
+        Evidence   = @()
+        Source     = "win11-cve-audit (internal)"
+        Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
+        Confidence = "N/A"
+        Items      = @()
+        Error      = $null
     }
-
-    if (-not $knownApps.ContainsKey($Name)) {
-        # Try to search NVD for unknown apps
-        $searchQuery = "$Name isan"
-        $nvdUrl = "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=$($searchQuery -replace ' ','+')"
-        try {
-            Invoke-RestMethod -Uri $nvdUrl -TimeoutSec 30 -Headers @{ "User-Agent" = "win11-cve-audit/1.0" }
-        } catch { Write-Error $_ }
-    }
-
-    # Simplified CVE check for known apps
-    $results = @()
-
-    # Check if we have info for this app
-    if ($knownApps.ContainsKey($Name)) {
-        # Simulated CVE check - in production would query NVD API
-        $results += [PSCustomObject]@{
-            CVE       = "N/A"
-            Description = "CVE lookup requires NVD API key for production use"
-            Severity  = "Check"
-            Status    = "Verify"
-            FixedVer  = "Check vendor"
-        }
-    }
-
-    return $results
 }

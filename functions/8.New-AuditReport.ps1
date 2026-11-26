@@ -69,19 +69,21 @@ function New-AuditReport {
     }
     AddBlank
 
-    # 3. Installed Applications (registry inventory)
+    # 3. Installed Applications (multi-source inventory)
     AddSection "3. Installed Applications"
     $apps = $null
     try {
-        $apps = Get-LocalSoftwareInventory -ErrorAction Stop |
-            Where-Object { $_.Source -eq 'Registry' } |
-            Sort-Object Name
-    } catch { $apps = $null }
+        $inv = Get-LocalSoftwareInventory -ErrorAction Stop
+        $apps = $inv.Inventory | Sort-Object Name
+        $coverage = $inv.Coverage
+    } catch { $apps = $null; $coverage = $null }
     if ($apps -and @($apps).Count -gt 0) {
+        AddLine "*Inventory coverage: $($coverage.TotalCount) applications from $($coverage.Sources -join ', ') (Registry: $($coverage.RegistryCount), winget: $($coverage.WingetCount), MSIX/AppX: $($coverage.MSIXCount))*"
+        AddBlank
         $appRows = foreach ($a in $apps) {
-            ,@((Clean $a.Name), ($(if ([string]::IsNullOrWhiteSpace([string]$a.Version)) { "N/A" } else { Clean $a.Version })), (Clean $a.Publisher))
+            ,@((Clean $a.Name), ($(if ([string]::IsNullOrWhiteSpace([string]$a.Version)) { "N/A" } else { Clean $a.Version })), (Clean $a.Publisher), (Clean $a.Source), (Clean $a.Scope), (Clean $a.Architecture))
         }
-        AddTable @("Application","Installed Version","Publisher") $appRows
+        AddTable @("Application","Installed Version","Publisher","Source","Scope","Architecture") $appRows
     } else {
         AddLine "*Unable to retrieve installed application inventory*"
     }
