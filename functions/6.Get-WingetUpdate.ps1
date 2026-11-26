@@ -35,14 +35,13 @@ function Invoke-WingetProcess {
     } catch {
         $caughtError = $_
         # Surface the error and return failure result
-        Write-Error "winget process failed: $($caughtError.Exception.Message)"
+        Write-Warning "winget process failed: $($caughtError.Exception.Message)"
         return [PSCustomObject]@{
             ExitCode        = $null
             StandardOutput  = $null
             StandardError   = $caughtError.Exception.Message
             ProcessFailed   = $true
         }
-        throw
     }
 
     return [PSCustomObject]@{

@@ -42,7 +42,8 @@ function Invoke-AuditRestMethod {
         if ($_.Exception.Response -and $_.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::NotFound) {
             throw
         }
-        # Intentionally fall through to proxy fallback; directError is rethrown if fallback fails
+        # Fall through to proxy fallback
+        Write-Warning "Direct connection failed, trying system proxy"
     } finally {
         [System.Net.WebRequest]::DefaultWebProxy = $oldProxy
     }
