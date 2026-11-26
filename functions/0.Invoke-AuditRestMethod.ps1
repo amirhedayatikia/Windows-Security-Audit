@@ -41,9 +41,8 @@ function Invoke-AuditRestMethod {
         if ($resp -and $resp.StatusCode -eq [System.Net.HttpStatusCode]::NotFound) {
             throw
         }
-        $directError = $_
-        # Non-empty catch block to satisfy PSScriptAnalyzer - fall through to system proxy fallback
-        Write-Error "Direct connection failed: $($directError.Exception.Message)"
+        # Fall through to system proxy fallback
+        Write-Error "Direct connection failed: $($_.Exception.Message)"
     } finally {
         [System.Net.WebRequest]::DefaultWebProxy = $oldProxy
     }
