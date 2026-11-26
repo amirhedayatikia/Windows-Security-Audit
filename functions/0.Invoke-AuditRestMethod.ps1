@@ -36,13 +36,13 @@ function Invoke-AuditRestMethod {
     try {
         return Invoke-RestMethod -Uri $Uri -TimeoutSec $TimeoutSec -UserAgent "win11-cve-audit/1.0"
     } catch {
-        $errorRecord = $Error[0]
+        $caughtError = $_
         # 404 means the resource does not exist; no point retrying via proxy
-        if ($errorRecord.Exception.Response -and $errorRecord.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::NotFound) {
-            throw
+        if ($caughtError.Exception.Response -and $caughtError.Exception.Response.StatusCode -eq [System.Net.HttpStatusCode]::NotFound) {
+            throw $caughtError
         }
         # Fall through to system proxy fallback
-        Write-Error "Direct connection failed: $($errorRecord.Exception.Message)"
+        throw $caughtError
     } finally {
         [System.Net.WebRequest]::DefaultWebProxy = $oldProxy
     }
@@ -52,6 +52,6 @@ function Invoke-AuditRestMethod {
         return Invoke-RestMethod -Uri $Uri -TimeoutSec $TimeoutSec -UserAgent "win11-cve-audit/1.0"
     } catch {
         # Surface the direct error - it is usually the more meaningful one
-        throw $Error[0]
+        throw $_
     }
 }
