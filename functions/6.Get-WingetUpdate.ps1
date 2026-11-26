@@ -42,7 +42,7 @@ function Invoke-WingetProcess {
             StandardError   = $caughtError.Exception.Message
             ProcessFailed   = $true
         }
-        throw $caughtError
+        throw
     }
 
     return [PSCustomObject]@{
