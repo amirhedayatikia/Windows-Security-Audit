@@ -93,7 +93,7 @@ Windows-Security-Audit/
 │   ├── 7.Test-SecurityFeature.ps1
 │   ├── 8.New-AuditReport.ps1
 │   └── 9.Get-PendingWindowsUpdate.ps1
-├── tests/                   # Pester regression tests (gitignored)
+├── tests/                   # Pester regression tests
 ├── .github/workflows/       # CI/CD validation
 ├── SECURITY.md
 └── README.md
