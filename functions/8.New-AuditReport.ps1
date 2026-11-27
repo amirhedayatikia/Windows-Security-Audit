@@ -53,17 +53,19 @@ function New-AuditReport {
 
     # --- Count outcomes for executive summary ---
     $counts = @{
-        PASS            = 0
-        FAIL            = 0
-        ERROR           = 0
-        UNKNOWN         = 0
-        'NOT APPLICABLE'= 0
-        'REQUIRES ELEVATION' = 0
-        'NOT ASSESSED'  = 0
-        AFFECTED        = 0
-        VULNERABLE      = 0
-        PATCHED         = 0
-        'NOT AFFECTED'  = 0
+        PASS                    = 0
+        FAIL                    = 0
+        ERROR                   = 0
+        UNKNOWN                 = 0
+        'NOT APPLICABLE'        = 0
+        'REQUIRES ELEVATION'    = 0
+        'NOT ASSESSED'          = 0
+        PATCHED                 = 0
+        VULNERABLE              = 0
+        'NOT AFFECTED'          = 0
+        PendingWindowsUpdates   = 0
+        AvailableWingetUpdates  = 0
+        KEVError                = 0
     }
 
     if ($features) {
@@ -80,12 +82,12 @@ function New-AuditReport {
         }
     }
     if ($wu) {
-        if ($wu.Status -eq 'AFFECTED') { $counts.AFFECTED++ }
+        if ($wu.Status -eq 'AFFECTED') { $counts.PendingWindowsUpdates += $wu.Items.Count }
         elseif ($wu.Status -eq 'ERROR') { $counts.ERROR++ }
         elseif ($wu.Status -eq 'NOT AFFECTED') { $counts['NOT AFFECTED']++ }
     }
     if ($updates) {
-        if ($updates.Status -eq 'UpdatesAvailable') { $counts.AFFECTED++ }
+        if ($updates.Status -eq 'UpdatesAvailable') { $counts.AvailableWingetUpdates += $updates.Items.Count }
         elseif ($updates.Status -in @('ExecutionFailed','SourceError','ParseError','Unavailable','Unknown')) { $counts.ERROR++ }
     }
 
@@ -108,12 +110,12 @@ function New-AuditReport {
     AddLine "| KEV Vulnerabilities (Patched) | $($counts.PATCHED) |"
     AddLine "| KEV Vulnerabilities (Vulnerable) | $($counts.VULNERABLE) |"
     AddLine "| KEV Vulnerabilities (Not Affected) | $($counts['NOT AFFECTED']) |"
-    AddLine "| Pending Windows Updates | $($counts.AFFECTED) |"
-    AddLine "| Available Winget Updates | $($counts.AFFECTED) |"
+    AddLine "| Pending Windows Updates | $($counts.PendingWindowsUpdates) |"
+    AddLine "| Available Winget Updates | $($counts.AvailableWingetUpdates) |"
     AddBlank
 
     # High-level assessment
-    $criticalIssues = $counts.FAIL + $counts.VULNERABLE + $counts.AFFECTED
+    $criticalIssues = $counts.FAIL + $counts.VULNERABLE + $counts.PendingWindowsUpdates + $counts.AvailableWingetUpdates
     if ($criticalIssues -gt 0) {
         AddLine "**Overall: $criticalIssues critical finding(s) require attention** (Failed checks, vulnerable KEV entries, or pending updates)"
     } else {
