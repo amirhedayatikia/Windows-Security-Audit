@@ -50,10 +50,14 @@ function Get-LocalSoftwareInventory {
         }
     }
 
-    # --- 2. WinGet repository inventory ---
-    try {
-        $wingetOutput = winget list --source winget 2>$null
-        if ($wingetOutput) {
+    # --- 2. WinGet repository inventory (scope-specific) ---
+    # Query winget list separately for user and machine scope so each package
+    # is labeled with its actual installation scope instead of defaulting to Machine.
+    $wingetScopes = @('user', 'machine')
+    foreach ($scope in $wingetScopes) {
+        try {
+            $wingetOutput = winget list --source winget --scope $scope 2>$null
+            if (-not $wingetOutput) { continue }
             $lines = $wingetOutput -split "`n"
             $headerIndex = $null
             for ($i = 0; $i -lt $lines.Count; $i++) {
@@ -84,7 +88,7 @@ function Get-LocalSoftwareInventory {
                             Version          = if ($version) { $version } else { 'N/A' }
                             Publisher        = 'N/A'  # winget list doesn't include publisher
                             Source           = 'winget'
-                            Scope            = 'Machine'  # winget list shows machine scope by default
+                            Scope            = if ($scope -eq 'user') { 'User' } else { 'Machine' }
                             Architecture     = 'Unknown'
                             Id               = $id
                             InstallLocation  = 'N/A'
@@ -94,9 +98,9 @@ function Get-LocalSoftwareInventory {
                     }
                 }
             }
+        } catch {
+            Write-Verbose "WinGet inventory failed for scope '$scope': $($_.Exception.Message)"
         }
-    } catch {
-        Write-Verbose "WinGet inventory failed: $($_.Exception.Message)"
     }
 
     # --- 3. MSIX/AppX inventory (current user; -AllUsers requires admin) ---

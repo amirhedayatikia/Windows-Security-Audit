@@ -174,22 +174,55 @@ function Test-SecurityFeature {
                 }
             }
         } catch {
-            $errMsg = $_.Exception.Message
-            $status = if ($errMsg -match "not supported|not available|firmware") { "NOT APPLICABLE" } else { "ERROR" }
-            $severity = if ($status -eq "NOT APPLICABLE") { "Informational" } else { "Medium" }
+            $ex = $_.Exception
+            $errMsg = $ex.Message
+            # Typed exception classification instead of English error message matching
+            if ($ex -is [System.UnauthorizedAccessException] -or $errMsg -match "access denied|privilege|unauthorized|elevated") {
+                $status = "REQUIRES ELEVATION"
+                $severity = "Informational"
+                $summary = "Secure Boot assessment requires administrator privileges"
+                $reason = "Confirm-SecureBootUEFI access denied: $errMsg"
+                $confidence = "High"
+                $errorOut = $null
+            } elseif ($ex -is [System.Management.Automation.CmdletInvocationException] -and $ex.TargetObject -is [System.Management.Automation.ErrorRecord]) {
+                # Underlying .NET exception from the cmdlet
+                $inner = $ex.TargetObject.Exception
+                if ($inner -is [System.UnauthorizedAccessException]) {
+                    $status = "REQUIRES ELEVATION"
+                    $severity = "Informational"
+                    $summary = "Secure Boot assessment requires administrator privileges"
+                    $reason = "Confirm-SecureBootUEFI access denied (inner): $($inner.Message)"
+                    $confidence = "High"
+                    $errorOut = $null
+                } else {
+                    $status = "NOT APPLICABLE"
+                    $severity = "Informational"
+                    $summary = "Secure Boot not supported on this firmware"
+                    $reason = "Confirm-SecureBootUEFI failed: $errMsg"
+                    $confidence = "High"
+                    $errorOut = if ($status -eq "ERROR") { $errMsg } else { $null }
+                }
+            } else {
+                $status = "NOT APPLICABLE"
+                $severity = "Informational"
+                $summary = "Secure Boot not supported on this firmware"
+                $reason = "Confirm-SecureBootUEFI failed: $errMsg"
+                $confidence = "High"
+                $errorOut = $null
+            }
             $results += [PSCustomObject]@{
                 CheckId    = "SEC-SB-001"
                 Name       = "Secure Boot"
                 Status     = $status
                 Severity   = $severity
-                Summary    = if ($status -eq "NOT APPLICABLE") { "Secure Boot not supported on this firmware" } else { "Unable to determine Secure Boot state" }
-                Reason     = if ($status -eq "NOT APPLICABLE") { "Firmware does not support UEFI Secure Boot or platform lacks Secure Boot capability" } else { "Confirm-SecureBootUEFI failed: $errMsg" }
+                Summary    = $summary
+                Reason     = $reason
                 Evidence   = @($errMsg)
                 Source     = "Confirm-SecureBootUEFI"
                 Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
-                Confidence = if ($status -eq "NOT APPLICABLE") { "High" } else { "N/A" }
+                Confidence = $confidence
                 Items      = @()
-                Error      = if ($status -eq "ERROR") { $errMsg } else { $null }
+                Error      = $errorOut
             }
         }
     }
@@ -213,13 +246,30 @@ function Test-SecurityFeature {
     } else {
         try {
             $tpm = Get-Tpm -ErrorAction Stop
+            # Get TPM spec version from Win32_Tpm CIM class (more authoritative than
+            # ManufacturerVersionFull20 which is the manufacturer-specific version)
+            $specVersion = $null
+            $tpmSpecSource = 'ManufacturerVersionFull20'
+            try {
+                $cimTpm = Get-CimInstance Win32_Tpm -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($cimTpm -and $null -ne $cimTpm.SpecVersion) {
+                    $specVersion = [string]$cimTpm.SpecVersion
+                    $tpmSpecSource = 'Win32_Tpm.SpecVersion'
+                } else {
+                    $specVersion = if ($null -ne $tpm.ManufacturerVersionFull20) { [string]$tpm.ManufacturerVersionFull20 } else { 'Unknown' }
+                }
+            } catch {
+                $specVersion = if ($null -ne $tpm.ManufacturerVersionFull20) { [string]$tpm.ManufacturerVersionFull20 } else { 'Unknown' }
+            }
+
             $items = @([PSCustomObject]@{
                 TpmPresent       = $tpm.TpmPresent
                 TpmReady         = $tpm.TpmReady
                 TpmEnabled       = $tpm.TpmEnabled
                 TpmActivated     = $tpm.TpmActivated
                 TpmOwned         = $tpm.TpmOwned
-                SpecVersion      = $tpm.ManufacturerVersionFull20
+                SpecVersion      = $specVersion
+                TpmSpecSource    = $tpmSpecSource
                 ManufacturerId   = $tpm.ManufacturerIdTxt
                 ManufacturerVer  = $tpm.ManufacturerVersion
             })
@@ -231,7 +281,7 @@ function Test-SecurityFeature {
                     Severity   = "Informational"
                     Summary    = "TPM 2.0 is present, ready, enabled, and activated"
                     Reason     = "All TPM readiness flags are true"
-                    Evidence   = @("Present: $($tpm.TpmPresent)", "Ready: $($tpm.TpmReady)", "Enabled: $($tpm.TpmEnabled)", "Activated: $($tpm.TpmActivated)", "SpecVersion: $($tpm.ManufacturerVersionFull20)")
+                    Evidence   = @("Present: $($tpm.TpmPresent)", "Ready: $($tpm.TpmReady)", "Enabled: $($tpm.TpmEnabled)", "Activated: $($tpm.TpmActivated)", "SpecVersion: $specVersion")
                     Source     = "Get-Tpm"
                     Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
                     Confidence = "High"
@@ -246,7 +296,7 @@ function Test-SecurityFeature {
                     Severity   = "Medium"
                     Summary    = "TPM present but not fully enabled/activated"
                     Reason     = "TPM is present and ready but Enabled=$($tpm.TpmEnabled) or Activated=$($tpm.TpmActivated)"
-                    Evidence   = @("Present: $($tpm.TpmPresent)", "Ready: $($tpm.TpmReady)", "Enabled: $($tpm.TpmEnabled)", "Activated: $($tpm.TpmActivated)", "SpecVersion: $($tpm.ManufacturerVersionFull20)")
+                    Evidence   = @("Present: $($tpm.TpmPresent)", "Ready: $($tpm.TpmReady)", "Enabled: $($tpm.TpmEnabled)", "Activated: $($tpm.TpmActivated)", "SpecVersion: $specVersion")
                     Source     = "Get-Tpm"
                     Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
                     Confidence = "High"
@@ -369,48 +419,130 @@ function Test-SecurityFeature {
 
     # --- 5. Windows Firewall ---
     try {
-        $fw = Get-NetFirewallProfile -ErrorAction Stop
-        $profileDetails = @()
-        $activeProfiles = @()
-        foreach ($p in $fw) {
-            $profileDetails += [PSCustomObject]@{
-                Name     = $p.Name
-                Enabled  = $p.Enabled
-                DefaultInboundAction   = $p.DefaultInboundAction
-                DefaultOutboundAction  = $p.DefaultOutboundAction
-                NotifyOnListen         = $p.NotifyOnListen
-            }
-            if ($p.Enabled) { $activeProfiles += $p.Name }
+        # Get effective (active store) firewall profiles - reflects the policy actually in force
+        $fwProfiles = Get-NetFirewallProfile -PolicyStoreSource ActiveStore -ErrorAction Stop
+
+        # Get active network connections to determine which firewall profile applies
+        $netProfiles = @()
+        try {
+            $netProfiles = Get-NetConnectionProfile -ErrorAction SilentlyContinue
+        } catch {
+            Write-Verbose "Failed to get network connection profiles: $($_.Exception.Message)"
         }
-        if ($activeProfiles.Count -gt 0) {
+
+        # Build profile details from ActiveStore
+        $profileDetails = @()
+        foreach ($p in $fwProfiles) {
+            $profileDetails += [PSCustomObject]@{
+                Name                 = $p.Name
+                Enabled              = $p.Enabled
+                DefaultInboundAction = $p.DefaultInboundAction
+                DefaultOutboundAction= $p.DefaultOutboundAction
+                NotifyOnListen       = $p.NotifyOnListen
+                PolicyStoreSource    = if ($p.PolicyStoreSource) { $p.PolicyStoreSource } else { 'Unknown' }
+            }
+        }
+
+        # Determine active network categories and map to firewall profile names
+        $activeCategories = @()
+        if ($netProfiles -and $netProfiles.Count -gt 0) {
+            foreach ($np in $netProfiles) {
+                $cat = if ($np.NetworkCategory) { [string]$np.NetworkCategory } else { 'Unknown' }
+                if ($activeCategories -notcontains $cat) {
+                    $activeCategories += $cat
+                }
+            }
+        }
+
+        # Map network category to firewall profile name
+        $categoryToProfile = @{
+            'DomainAuthenticated' = 'Domain'
+            'Domain'              = 'Domain'
+            'Private'             = 'Private'
+            'Public'              = 'Public'
+        }
+
+        # Check each active network's corresponding firewall profile
+        $activeProfileStates = @()
+        $allActiveEnabled = $true
+        $anyActiveFound = $false
+        foreach ($cat in $activeCategories) {
+            $profileName = if ($categoryToProfile.ContainsKey($cat)) { $categoryToProfile[$cat] } else { $cat }
+            $fwProfile = $fwProfiles | Where-Object { $_.Name -eq $profileName } | Select-Object -First 1
+            if ($fwProfile) {
+                $anyActiveFound = $true
+                $isEnabled = [bool]$fwProfile.Enabled
+                $activeProfileStates += @("$(${profileName}): Enabled=$isEnabled")
+                if (-not $isEnabled) {
+                    $allActiveEnabled = $false
+                }
+            }
+        }
+
+        if ($anyActiveFound -and $allActiveEnabled) {
             $results += [PSCustomObject]@{
                 CheckId    = "SEC-FW-001"
                 Name       = "Windows Firewall"
                 Status     = "PASS"
                 Severity   = "Informational"
-                Summary    = "Windows Firewall is enabled on $($activeProfiles.Count) profile(s): $($activeProfiles -join ', ')"
-                Reason     = "Get-NetFirewallProfile shows enabled profiles: $($activeProfiles -join ', ')"
+                Summary    = "Windows Firewall is enabled on all active network profile(s): $($activeProfileStates -join '; ')"
+                Reason     = "ActiveStore firewall policy is enabled for active network categories: $($activeCategories -join ', ')"
                 Evidence   = $profileDetails | ForEach-Object { "$($_.Name): Enabled=$($_.Enabled), Inbound=$($_.DefaultInboundAction), Outbound=$($_.DefaultOutboundAction)" }
-                Source     = "Get-NetFirewallProfile"
+                Source     = "Get-NetFirewallProfile -PolicyStoreSource ActiveStore + Get-NetConnectionProfile"
+                Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
+                Confidence = "High"
+                Items      = $profileDetails
+                Error      = $null
+            }
+        } elseif ($anyActiveFound -and -not $allActiveEnabled) {
+            $results += [PSCustomObject]@{
+                CheckId    = "SEC-FW-001"
+                Name       = "Windows Firewall"
+                Status     = "FAIL"
+                Severity   = "High"
+                Summary    = "Windows Firewall is disabled on active network profile(s)"
+                Reason     = "ActiveStore firewall policy is disabled for one or more active network categories: $($activeCategories -join ', ')"
+                Evidence   = $profileDetails | ForEach-Object { "$($_.Name): Enabled=$($_.Enabled)" }
+                Source     = "Get-NetFirewallProfile -PolicyStoreSource ActiveStore + Get-NetConnectionProfile"
                 Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
                 Confidence = "High"
                 Items      = $profileDetails
                 Error      = $null
             }
         } else {
-            $results += [PSCustomObject]@{
-                CheckId    = "SEC-FW-001"
-                Name       = "Windows Firewall"
-                Status     = "FAIL"
-                Severity   = "High"
-                Summary    = "Windows Firewall is disabled on all profiles"
-                Reason     = "No enabled profiles found in Get-NetFirewallProfile"
-                Evidence   = $profileDetails | ForEach-Object { "$($_.Name): Enabled=$($_.Enabled)" }
-                Source     = "Get-NetFirewallProfile"
-                Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
-                Confidence = "High"
-                Items      = $profileDetails
-                Error      = $null
+            # No active network connections found; fall back to reporting all profiles
+            $enabledCount = @($fwProfiles | Where-Object { $_.Enabled }).Count
+            if ($enabledCount -gt 0) {
+                $enabledNames = @($fwProfiles | Where-Object { $_.Enabled} | ForEach-Object { $_.Name }) -join ', '
+                $results += [PSCustomObject]@{
+                    CheckId    = "SEC-FW-001"
+                    Name       = "Windows Firewall"
+                    Status     = "PASS"
+                    Severity   = "Informational"
+                    Summary    = "Windows Firewall is enabled on $enabledCount profile(s): $enabledNames (no active network connection detected)"
+                    Reason     = "No active network connection detected; reporting all ActiveStore firewall profile states"
+                    Evidence   = $profileDetails | ForEach-Object { "$($_.Name): Enabled=$($_.Enabled), Inbound=$($_.DefaultInboundAction), Outbound=$($_.DefaultOutboundAction)" }
+                    Source     = "Get-NetFirewallProfile -PolicyStoreSource ActiveStore"
+                    Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
+                    Confidence = "High"
+                    Items      = $profileDetails
+                    Error      = $null
+                }
+            } else {
+                $results += [PSCustomObject]@{
+                    CheckId    = "SEC-FW-001"
+                    Name       = "Windows Firewall"
+                    Status     = "FAIL"
+                    Severity   = "High"
+                    Summary    = "Windows Firewall is disabled on all profiles (no active network connection detected)"
+                    Reason     = "No enabled profiles found in ActiveStore firewall policy and no active network connection detected"
+                    Evidence   = $profileDetails | ForEach-Object { "$($_.Name): Enabled=$($_.Enabled)" }
+                    Source     = "Get-NetFirewallProfile -PolicyStoreSource ActiveStore"
+                    Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
+                    Confidence = "High"
+                    Items      = $profileDetails
+                    Error      = $null
+                }
             }
         }
     } catch {
@@ -422,7 +554,7 @@ function Test-SecurityFeature {
             Summary    = "Unable to query Windows Firewall status"
             Reason     = "Get-NetFirewallProfile failed: $($_.Exception.Message)"
             Evidence   = @($_.Exception.Message)
-            Source     = "Get-NetFirewallProfile"
+            Source     = "Get-NetFirewallProfile -PolicyStoreSource ActiveStore"
             Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
             Confidence = "N/A"
             Items      = @()
