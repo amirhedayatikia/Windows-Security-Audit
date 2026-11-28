@@ -47,8 +47,11 @@ $env:PSModulePath/
 tests/
 
 # Project working documents - local only
-MODIFICATION-PLAN.md
-Review-24-11.md
+*.md
+!README.md
+!SECURITY.md
+!CONTRIBUTING.md
+!CODE_OF_CONDUCT.md
 
 # Windows-specific paths in output (sanitized, no username or drive letters)
 # Lines that may contain local paths in generated reports
