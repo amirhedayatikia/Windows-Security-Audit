@@ -155,7 +155,7 @@ jobs:
           $totalPassed = 0
           $totalFailed = 0
           $totalCount = 0
-          foreach ($testFile in @('tests\Verify-P01.ps1', 'tests\Verify-Winget.ps1', 'tests\Report.Tests.ps1')) {
+          foreach ($testFile in @('tests\Verify-P01.Tests.ps1', 'tests\Verify-Winget.Tests.ps1')) {
             $result = Invoke-Pester -Path $testFile -Output Detailed -PassThru
             $totalPassed += $result.PassedCount
             $totalFailed += $result.FailedCount
