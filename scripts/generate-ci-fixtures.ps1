@@ -195,8 +195,8 @@ Describe "Get-WingetUpdate availability check" {
 '@
 $verifyWinget | Set-Content -Path (Join-Path $testDir 'Verify-Winget.ps1') -Encoding UTF8
 
-# --- Generate Report.Tests.ps1 test file (simple function existence checks) ---
-# Pre-compute command availability at module load time (outside Describe blocks)
+# --- Generate Report.Tests.ps1 test file (simple function existence via module) ---
+# Check all required commands are available at module load time (outside Describe blocks)
 $cmdNames = @(
     "New-AuditReport",
     "Get-KevVulnerabilityStatus",
@@ -213,37 +213,18 @@ $cmdNames = @(
     "Get-SupportLifecycleStatus"
 )
 
-$cmdCheck = @'
-$commandNames = @(
-    "New-AuditReport",
-    "Get-KevVulnerabilityStatus",
-    "ConvertFrom-WingetUpgradeOutput",
-    "Get-WingetUpdate",
-    "Test-SecurityFeature",
-    "Get-LocalSoftwareInventory",
-    "Get-PendingWindowsUpdate",
-    "Get-WindowsBuildInfo",
-    "Get-AppCveStatus",
-    "Get-WingetUpdateStructured",
-    "Get-SupportLifecycleStatus",
-    "Get-ReleaseChannelStatus",
-    "Get-SupportLifecycleStatus"
-)
-
-$missingCommands = @()
-foreach ($cmdName in $commandNames) {
-    $cmd = Get-Command $cmdName -ErrorAction SilentlyContinue
-    if (-not $cmd) { $missingCommands += $cmdName }
+$missingCmds = @()
+foreach ($name in $cmdNames) {
+    $cmd = Get-Command $name -ErrorAction SilentlyContinue
+    if (-not $cmd) { $missingCmds += $name }
 }
 
-$missingCommandsCount = $missingCommands.Count
+$missingCount = $missingCmds.Count
 
-'@
-
-$reportTests = $moduleImport + $cmdCheck + @'
+$reportTests = $moduleImport + @'
 Describe "Function exports via module manifest" {
     It "All required functions are exported" {
-        $missingCommandsCount | Should Be 0
+        $missingCount | Should Be 0
     }
 
     It "New-AuditReport is available" {
