@@ -8,7 +8,9 @@
 #   tests/fixtures/winget-source-err.txt - Sample winget source/network error output
 
 $ErrorActionPreference = 'Stop'
-$fixtureDir = Join-Path $PSScriptRoot 'tests\fixtures'
+# Create tests/ at repository root (one level up from scripts/)
+$repoRoot = Split-Path $PSScriptRoot -Parent
+$fixtureDir = Join-Path $repoRoot 'tests\fixtures'
 if (-not (Test-Path $fixtureDir)) {
     New-Item -ItemType Directory -Path $fixtureDir -Force | Out-Null
 }
