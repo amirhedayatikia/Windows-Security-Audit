@@ -14,7 +14,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Install PSScriptAnalyzer
         shell: pwsh
@@ -174,7 +174,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Run full audit report (integration smoke test)
         shell: pwsh
@@ -210,7 +210,7 @@ jobs:
           Write-Host "✓ All 10 report sections present"
 
       - name: Upload audit report artifact
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: security-audit-report
           path: $(Join-Path $env:TEMP 'integration-audit-report.md')
