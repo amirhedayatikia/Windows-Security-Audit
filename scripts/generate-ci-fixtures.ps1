@@ -68,12 +68,23 @@ Please check your network connection and try again.
 '@
 $wingetSourceErr | Set-Content -Path (Join-Path $fixtureDir 'winget-source-err.txt') -Encoding UTF8
 
-# --- Generate Verify-P01.ps1 test file ---
-$verifyP01 = @'
-$ErrorActionPreference = "Stop"
+# Common function imports for all test files
+$commonImports = @'
 $root = Join-Path $PSScriptRoot ".."
+# Import all functions needed by New-AuditReport
+. (Join-Path $root "functions\0.Invoke-AuditRestMethod.ps1")
+. (Join-Path $root "functions\1.Get-WindowsBuildInfo.ps1")
+. (Join-Path $root "functions\2.Get-LocalSoftwareInventory.ps1")
+. (Join-Path $root "functions\3.Get-KevVulnerabilityStatus.ps1")
+. (Join-Path $root "functions\5.Get-AppCveStatus.ps1")
 . (Join-Path $root "functions\6.Get-WingetUpdate.ps1")
+. (Join-Path $root "functions\7.Test-SecurityFeature.ps1")
+. (Join-Path $root "functions\8.New-AuditReport.ps1")
+. (Join-Path $root "functions\9.Get-PendingWindowsUpdate.ps1")
+'@
 
+# --- Generate Verify-P01.ps1 test file ---
+$verifyP01 = $commonImports + @'
 Write-Host "=== P0/P1 WinGet report behavior ==="
 $output = @(
     "Name             Id               Version Available Source",
@@ -109,10 +120,9 @@ if ($live.Status -notin @("UpdatesAvailable","NoUpdates","Unavailable","Executio
 $verifyP01 | Set-Content -Path (Join-Path $testDir 'Verify-P01.ps1') -Encoding UTF8
 
 # --- Generate Verify-Winget.ps1 test file ---
-$verifyWinget = @'
+$verifyWinget = $commonImports + @'
 Describe "ConvertFrom-WingetUpgradeOutput" {
     It "Distinguishes a successful zero-update scan" {
-        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
         $output = @(
             "Name             Id               Version Available Source",
             "-----------------------------------------------------------",
@@ -125,7 +135,6 @@ Describe "ConvertFrom-WingetUpgradeOutput" {
     }
 
     It "Returns available updates from valid output" {
-        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
         $output = @(
             "Name             Id               Version Available Source",
             "-----------------------------------------------------------",
@@ -141,14 +150,12 @@ Describe "ConvertFrom-WingetUpgradeOutput" {
     }
 
     It "Returns ParseError for empty output" {
-        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
         $result = ConvertFrom-WingetUpgradeOutput -Output @() -Stderr $null -ExitCode 0
         $result.Status | Should Not Be "NoUpdates"
         $result.Status | Should Be "ParseError"
     }
 
     It "Multi-word package names parse correctly" {
-        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
         $output = @(
             "Name             Id               Version Available Source",
             "-----------------------------------------------------------",
@@ -163,7 +170,6 @@ Describe "ConvertFrom-WingetUpgradeOutput" {
     }
 
     It "Returns SourceError when output indicates source failure" {
-        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
         $output = @(
             "Error: Package source is unavailable",
             "Please check your network connection."
@@ -174,7 +180,6 @@ Describe "ConvertFrom-WingetUpgradeOutput" {
     }
 
     It "Returns ParseError for unrecognized successful output" {
-        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
         $output = @(
             "Some unexpected successful output",
             "Without known headers"
@@ -187,7 +192,6 @@ Describe "ConvertFrom-WingetUpgradeOutput" {
 
 Describe "Get-WingetUpdate availability check" {
     It "Returns Unavailable when winget executable is missing" {
-        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
         $result = Get-WingetUpdate -WinGetPath "C:\Not\Exist\winget.exe"
         $result.Status | Should Be "Unavailable"
         $result.Items.Count | Should Be 0
@@ -198,14 +202,8 @@ Describe "Get-WingetUpdate availability check" {
 $verifyWinget | Set-Content -Path (Join-Path $testDir 'Verify-Winget.ps1') -Encoding UTF8
 
 # --- Generate Report.Tests.ps1 test file ---
-$reportTests = @'
+$reportTests = $commonImports + @'
 Describe "New-AuditReport executive summary hardening" {
-    BeforeAll {
-        $root = Join-Path $PSScriptRoot ".."
-        . (Join-Path $root "functions\8.New-AuditReport.ps1")
-        . (Join-Path $root "functions\0.Invoke-AuditRestMethod.ps1")
-    }
-
     It "Reports Audit incomplete when KEV check fails" {
         $report = New-AuditReport -OutputPath (Join-Path $env:TEMP "test-audit-report.md") -LookbackMonths 12 -ErrorAction SilentlyContinue
         $report | Should Not Be $null
@@ -220,11 +218,6 @@ Describe "New-AuditReport executive summary hardening" {
 }
 
 Describe "KEV error produces explicit ERROR status" {
-    BeforeAll {
-        $root = Join-Path $PSScriptRoot ".."
-        . (Join-Path $root "functions\3.Get-KevVulnerabilityStatus.ps1")
-    }
-
     It "Get-KevVulnerabilityStatus throws on missing build number" {
         { Get-KevVulnerabilityStatus -BuildNumber "" -UBR 1 } | Should Throw
     }
