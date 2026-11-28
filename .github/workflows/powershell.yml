@@ -152,14 +152,20 @@ jobs:
         run: |
           Install-Module Pester -RequiredVersion 6.2.0 -Force -Scope CurrentUser -ErrorAction SilentlyContinue
           Import-Module Pester -MinimumVersion 6.0 -Force -ErrorAction SilentlyContinue
-          $testResults = Invoke-Pester -Path 'tests\Verify-P01.ps1' -Output Detailed -PassThru
-          $testResults += Invoke-Pester -Path 'tests\Verify-Winget.ps1' -Output Detailed -PassThru
-          $testResults += Invoke-Pester -Path 'tests\Report.Tests.ps1' -Output Detailed -PassThru
-          if ($testResults.FailedCount -gt 0) {
-            Write-Error "Pester tests failed: $($testResults.FailedCount) of $($testResults.TotalCount)"
+          $totalPassed = 0
+          $totalFailed = 0
+          $totalCount = 0
+          foreach ($testFile in @('tests\Verify-P01.ps1', 'tests\Verify-Winget.ps1', 'tests\Report.Tests.ps1')) {
+            $result = Invoke-Pester -Path $testFile -Output Detailed -PassThru
+            $totalPassed += $result.PassedCount
+            $totalFailed += $result.FailedCount
+            $totalCount += $result.TotalCount
+          }
+          if ($totalFailed -gt 0) {
+            Write-Error "Pester tests failed: $totalFailed of $totalCount"
             exit 1
           }
-          Write-Host "✓ All Pester tests passed ($($testResults.PassedCount)/$($testResults.TotalCount))"
+          Write-Host "✓ All Pester tests passed ($totalPassed/$totalCount)"
 
   integration-test:
     name: Windows Integration Test
