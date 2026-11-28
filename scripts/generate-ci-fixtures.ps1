@@ -68,9 +68,9 @@ Please check your network connection and try again.
 '@
 $wingetSourceErr | Set-Content -Path (Join-Path $fixtureDir 'winget-source-err.txt') -Encoding UTF8
 
-# Use absolute module import - module is at repo root
+# Use module import from repo root - test files are in tests/ subdir
 $moduleImport = @'
-Import-Module (Join-Path (Split-Path $PSScriptRoot -Parent) "win11-cve-audit.psd1") -Force -ErrorAction Stop
+Import-Module (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) "win11-cve-audit.psd1") -Force -ErrorAction Stop
 '@
 
 # --- Generate Verify-P01.ps1 test file ---
@@ -92,8 +92,8 @@ if ($missing.Status -ne "Unavailable") { throw "Missing winget incorrectly repor
 Write-Host "PASS: WinGet output and availability checks"
 
 Write-Host "=== Module exports ==="
-$manifest = Import-PowerShellDataFile (Join-Path (Split-Path $PSScriptRoot -Parent) "win11-cve-audit.psd1")
-Import-Module (Join-Path (Split-Path $PSScriptRoot -Parent) "win11-cve-audit.psd1") -Force -WarningAction SilentlyContinue
+$manifest = Import-PowerShellDataFile (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) "win11-cve-audit.psd1")
+Import-Module (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) "win11-cve-audit.psd1") -Force -WarningAction SilentlyContinue
 $commands = @(Get-Command -Module win11-cve-audit -CommandType Function)
 foreach ($name in $manifest.FunctionsToExport) {
     if ($commands.Name -notcontains $name) { throw "Manifest exports missing function: $name" }
