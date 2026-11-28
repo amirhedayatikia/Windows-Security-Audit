@@ -1,18 +1,16 @@
-# Generates deterministic Pester test fixtures for CI when the tests/ directory
+# Generates deterministic Pester test fixtures AND test files for CI when the tests/ directory
 # is absent (it is gitignored per repo policy). Run this step before Invoke-Pester.
-#
-# Outputs:
-#   tests/fixtures/kev-sample.json     - Sample CISA KEV catalog subset
-#   tests/fixtures/winget-updates.txt  - Sample winget upgrade output with updates
-#   tests/fixtures/winget-none.txt     - Sample winget upgrade output, no updates
-#   tests/fixtures/winget-source-err.txt - Sample winget source/network error output
 
 $ErrorActionPreference = 'Stop'
 # Create tests/ at repository root (one level up from scripts/)
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $fixtureDir = Join-Path $repoRoot 'tests\fixtures'
+$testDir = Join-Path $repoRoot 'tests'
 if (-not (Test-Path $fixtureDir)) {
     New-Item -ItemType Directory -Path $fixtureDir -Force | Out-Null
+}
+if (-not (Test-Path $testDir)) {
+    New-Item -ItemType Directory -Path $testDir -Force | Out-Null
 }
 
 # --- KEV sample fixture: Microsoft Windows entries in lookback window ---
@@ -70,5 +68,175 @@ Please check your network connection and try again.
 '@
 $wingetSourceErr | Set-Content -Path (Join-Path $fixtureDir 'winget-source-err.txt') -Encoding UTF8
 
+# --- Generate Verify-P01.ps1 test file ---
+$verifyP01 = @'
+$ErrorActionPreference = '"'"'Stop'"'"'
+$root = Join-Path $PSScriptRoot '"'"'..'"'"'
+. (Join-Path $root '"'"'functions\6.Get-WingetUpdate.ps1'"'"')
+
+Write-Host '"'"'=== P0/P1 WinGet report behavior ==='"'"'
+$output = @(
+    '"'"'Name             Id               Version Available Source'"'"',
+    '"'"'-----------------------------------------------------------'"'"',
+    '"'"'Example Package  Example.Package  1.0     2.0       winget'"'"'
+)
+$result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
+if ($result.Status -ne '"'"'UpdatesAvailable'"'"') { throw "Expected UpdatesAvailable, got $($result.Status)" }
+if ($result.Items.Count -ne 1) { throw "Expected 1 update, got $($result.Items.Count)" }
+if ($result.Items[0].Name -ne '"'"'Example Package'"'"') { throw "Name mismatch: $($result.Items[0].Name)" }
+$empty = ConvertFrom-WingetUpgradeOutput -Output @() -Stderr $null -ExitCode 0
+if ($empty.Status -ne '"'"'ParseError'"'"') { throw "Empty output incorrectly reported as $($empty.Status)" }
+$missing = Get-WingetUpdate -WinGetPath '"'"'C:\Not\Exist\winget.exe'"'"'
+if ($missing.Status -ne '"'"'Unavailable'"'"') { throw "Missing winget incorrectly reported as $($missing.Status)" }
+Write-Host '"'"'PASS: WinGet output and availability checks'"'"'
+
+Write-Host '"'"'=== Module exports ==='"'"'
+$manifest = Import-PowerShellDataFile (Join-Path $root '"'"'win11-cve-audit.psd1'"'"')
+Import-Module (Join-Path $root '"'"'win11-cve-audit.psd1'"'"') -Force -WarningAction SilentlyContinue
+$commands = @(Get-Command -Module win11-cve-audit -CommandType Function)
+foreach ($name in $manifest.FunctionsToExport) {
+    if ($commands.Name -notcontains $name) { throw "Manifest exports missing function: $name" }
+}
+Write-Host '"'"'PASS: Manifest exports match defined functions'"'"'
+
+Write-Host '"'"'=== Live WinGet update check ==='"'"'
+$live = Get-WingetUpdate
+Write-Host ("WinGet status: $($live.Status); packages: $($live.Items.Count); reason: $($live.Reason)")
+if ($live.Status -notin @('"'"'UpdatesAvailable'"'"','"'"'NoUpdates'"'"','"'"'Unavailable'"'"','"'"'ExecutionFailed'"'"','"'"'SourceError'"'"','"'"'ParseError'"'"')) {
+    throw "Unexpected WinGet status: $($live.Status)"
+}
+'@
+$verifyP01 | Set-Content -Path (Join-Path $testDir 'Verify-P01.ps1') -Encoding UTF8
+
+# --- Generate Verify-Winget.ps1 test file ---
+$verifyWinget = @'
+Describe '"'"'ConvertFrom-WingetUpgradeOutput'"'"' {
+    It '"'"'Distinguishes a successful zero-update scan'"'"' {
+        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
+        $output = @(
+            '"'"'Name             Id               Version Available Source'"'"',
+            '"'"'-----------------------------------------------------------'"'"',
+            '"'"'No installed package found matching input criteria.'"'"'
+        )
+        $result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
+        $result.Status | Should Be '"'"'NoUpdates'"'"'
+        $result.Items.Count | Should Be 0
+        $result.Reason | Should Be '"'"'No winget packages have available updates'"'"'
+    }
+
+    It '"'"'Returns available updates from valid output'"'"' {
+        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
+        $output = @(
+            '"'"'Name             Id               Version Available Source'"'"',
+            '"'"'-----------------------------------------------------------'"'"',
+            '"'"'Example Package  Example.Package  1.0     2.0       winget'"'"'
+        )
+        $result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
+        $result.Status | Should Be '"'"'UpdatesAvailable'"'"'
+        $result.Items.Count | Should Be 1
+        $result.Items[0].Name | Should Be '"'"'Example Package'"'"'
+        $result.Items[0].Id | Should Be '"'"'Example.Package'"'"'
+        $result.Items[0].InstalledVersion | Should Be '"'"'1.0'"'"'
+        $result.Items[0].AvailableVersion | Should Be '"'"'2.0'"'"'
+    }
+
+    It '"'"'Returns ParseError for empty output'"'"' {
+        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
+        $result = ConvertFrom-WingetUpgradeOutput -Output @() -Stderr $null -ExitCode 0
+        $result.Status | Should Not Be '"'"'NoUpdates'"'"'
+        $result.Status | Should Be '"'"'ParseError'"'"'
+    }
+
+    It '"'"'Multi-word package names parse correctly'"'"' {
+        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
+        $output = @(
+            '"'"'Name             Id               Version Available Source'"'"',
+            '"'"'-----------------------------------------------------------'"'"',
+            '"'"'Microsoft Edge   Microsoft.Edge   1.0     2.0       winget'"'"',
+            '"'"'Visual Studio Code  Microsoft.VisualStudio.Code   1.1    1.2    winget'"'"'
+        )
+        $result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
+        $result.Status | Should Be '"'"'UpdatesAvailable'"'"'
+        $result.Items.Count | Should Be 2
+        $result.Items[0].Name | Should Be '"'"'Microsoft Edge'"'"'
+        $result.Items[1].Name | Should Be '"'"'Visual Studio Code'"'"'
+    }
+
+    It '"'"'Returns SourceError when output indicates source failure'"'"' {
+        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
+        $output = @(
+            '"'"'Error: Package source is unavailable'"'"',
+            '"'"'Please check your network connection.'"'"'
+        )
+        $result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
+        $result.Status | Should Be '"'"'SourceError'"'"'
+        $result.Items.Count | Should Be 0
+    }
+
+    It '"'"'Returns ParseError for unrecognized successful output'"'"' {
+        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
+        $output = @(
+            '"'"'Some unexpected successful output'"'"',
+            '"'"'Without known headers'"'"'
+        )
+        $result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
+        $result.Status | Should Be '"'"'ParseError'"'"'
+        $result.Items.Count | Should Be 0
+    }
+}
+
+Describe '"'"'Get-WingetUpdate availability check'"'"' {
+    It '"'"'Returns Unavailable when winget executable is missing'"'"' {
+        . "$PSScriptRoot\..\functions\6.Get-WingetUpdate.ps1"
+        $result = Get-WingetUpdate -WinGetPath '"'"'C:\Not\Exist\winget.exe'"'"'
+        $result.Status | Should Be '"'"'Unavailable'"'"'
+        $result.Items.Count | Should Be 0
+        $result.Error | Should Match '"'"'not found'"'"'
+    }
+}
+'@
+$verifyWinget | Set-Content -Path (Join-Path $testDir 'Verify-Winget.ps1') -Encoding UTF8
+
+# --- Generate Report.Tests.ps1 test file ---
+$reportTests = @'
+Describe '"'"'New-AuditReport executive summary hardening'"'"' {
+    BeforeAll {
+        $root = Join-Path $PSScriptRoot '"'"'..'"'"'
+        . (Join-Path $root '"'"'functions\8.New-AuditReport.ps1'"'"')
+        . (Join-Path $root '"'"'functions\0.Invoke-AuditRestMethod.ps1'"'"')
+    }
+
+    It '"'"'Reports Audit incomplete when KEV check fails'"'"' {
+        $report = New-AuditReport -OutputPath (Join-Path $env:TEMP '"'"'test-audit-report.md'"'"') -LookbackMonths 12 -ErrorAction SilentlyContinue
+        $report | Should Not Be $null
+        $report | Should Match '"'"'Executive Summary'"'"'
+    }
+
+    It '"'"'Separate PendingWindowsUpdates and AvailableWingetUpdates counters'"'"' {
+        $report = New-AuditReport -OutputPath (Join-Path $env:TEMP '"'"'test-audit-report2.md'"'"') -LookbackMonths 12 -ErrorAction SilentlyContinue
+        $report | Should Match '"'"'Pending Windows Updates'"'"'
+        $report | Should Match '"'"'Available Winget Updates'"'"'
+    }
+}
+
+Describe '"'"'KEV error produces explicit ERROR status'"'"' {
+    BeforeAll {
+        $root = Join-Path $PSScriptRoot '"'"'..'"'"'
+        . (Join-Path $root '"'"'functions\3.Get-KevVulnerabilityStatus.ps1'"'"')
+    }
+
+    It '"'"'Get-KevVulnerabilityStatus throws on missing build number'"'"' {
+        { Get-KevVulnerabilityStatus -BuildNumber '"'"''"'"' -UBR 1 } | Should Throw
+    }
+
+    It '"'"'Get-KevVulnerabilityStatus throws on missing UBR'"'"' {
+        { Get-KevVulnerabilityStatus -BuildNumber 26200 -UBR $null } | Should Throw
+    }
+}
+'@
+$reportTests | Set-Content -Path (Join-Path $testDir 'Report.Tests.ps1') -Encoding UTF8
+
 Write-Host "Generated test fixtures in $fixtureDir"
 Get-ChildItem $fixtureDir | ForEach-Object { Write-Host ("  " + $_.Name) }
+Write-Host "Generated test files in $testDir"
+Get-ChildItem $testDir -Filter '*.Tests.ps1' | ForEach-Object { Write-Host ("  " + $_.Name) }
