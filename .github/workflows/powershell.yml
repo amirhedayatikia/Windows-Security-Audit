@@ -135,21 +135,78 @@ jobs:
             fi
           done
 
+      - name: Generate CI test fixtures (tests/ is gitignored)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path tests)) {
+            Write-Host "tests/ directory not present; generating CI fixtures..."
+            & ./scripts/generate-ci-fixtures.ps1
+            if (-not (Test-Path tests)) {
+              Write-Error "Fixture generation failed; tests/ directory still missing"
+              exit 1
+            }
+          }
+
       - name: Run Pester unit tests
         shell: pwsh
         run: |
-          if (Test-Path tests) {
-            Write-Host "Installing Pester..."
-            Install-Module Pester -Force -Scope CurrentUser -ErrorAction SilentlyContinue
-            $testResults = Invoke-Pester -Script @{ Path = 'tests\Verify-P01.ps1'; Parameters = @{} } -Output Detailed
-            $testResults += Invoke-Pester -Script @{ Path = 'tests\Verify-Winget.ps1'; Parameters = @{} } -Output Detailed
-            if ($testResults.FailedCount -gt 0) {
-              Write-Error "Pester tests failed: $($testResults.FailedCount) of $($testResults.TotalCount)"
-              exit 1
-            }
-            Write-Host "✓ All Pester tests passed ($($testResults.PassedCount)/$($testResults.TotalCount))"
-          } else {
-            Write-Warning "No tests directory found, skipping Pester tests"
+          Install-Module Pester -Force -Scope CurrentUser -ErrorAction SilentlyContinue
+          $testResults = Invoke-Pester -Script @{ Path = 'tests\Verify-P01.ps1'; Parameters = @{} } -Output Detailed
+          $testResults += Invoke-Pester -Script @{ Path = 'tests\Verify-Winget.ps1'; Parameters = @{} } -Output Detailed
+          $testResults += Invoke-Pester -Script @{ Path = 'tests\Report.Tests.ps1'; Parameters = @{} } -Output Detailed
+          if ($testResults.FailedCount -gt 0) {
+            Write-Error "Pester tests failed: $($testResults.FailedCount) of $($testResults.TotalCount)"
+            exit 1
           }
+          Write-Host "✓ All Pester tests passed ($($testResults.PassedCount)/$($testResults.TotalCount))"
+
+  integration-test:
+    name: Windows Integration Test
+    runs-on: windows-latest
+    needs: lint-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Run full audit report (integration smoke test)
+        shell: pwsh
+        run: |
+          # Import the module and generate a report to verify end-to-end flow works
+          Import-Module ./win11-cve-audit.psd1 -Force -ErrorAction Stop
+          $report = New-AuditReport -OutputPath (Join-Path $env:TEMP 'integration-audit-report.md') -ErrorAction Stop
+          Write-Host "Report generated successfully"
+          Write-Host "Report length: $($report.Length) characters"
+          # Verify the report contains all required sections
+          $requiredSections = @(
+            'Executive Summary',
+            'System Information',
+            'Security Features',
+            'Installed Applications',
+            'CISA KEV Coverage',
+            'Available Updates',
+            'Pending Windows Updates',
+            'Assessment Coverage and Limitations',
+            'Data Sources and Timestamps',
+            'Recommended Actions'
+          )
+          $missing = @()
+          foreach ($section in $requiredSections) {
+            if ($report -notmatch $section) {
+              $missing += $section
+            }
+          }
+          if ($missing.Count -gt 0) {
+            Write-Error "Report missing sections: $($missing -join ', ')"
+            exit 1
+          }
+          Write-Host "✓ All 10 report sections present"
+
+      - name: Upload audit report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-report
+          path: ${{ env.TEMP }}\integration-audit-report.md
+          retention-days: 7
 
       

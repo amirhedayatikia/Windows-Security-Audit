@@ -41,15 +41,35 @@ function New-AuditReport {
     $coverage = if ($inv) { $inv.Coverage } else { $null }
     $wu = Get-PendingWindowsUpdate -ErrorAction SilentlyContinue
     $kevStatus = @()
+    $kevError = $null
+    $auditComplete = $true
     if ($build -and -not [string]::IsNullOrWhiteSpace([string]$build.BuildNumber) -and $null -ne $build.UBR) {
         try {
             $kevStatus = Get-KevVulnerabilityStatus -BuildNumber $build.BuildNumber -UBR $build.UBR `
                 -AuditDate $auditDate -LookbackMonths $LookbackMonths `
                 -IsServer:([bool]($build.OSCaption -match 'Server')) -ErrorAction Stop
             $kevStatus = @($kevStatus)
-        } catch { $kevStatus = @() }
+        } catch {
+            $kevError = $_.Exception.Message
+            $kevStatus = @()
+            $auditComplete = $false
+        }
     }
     $updates = Get-WingetUpdate -ErrorAction SilentlyContinue
+
+    # Track winget errors for audit completeness
+    $wingetError = $null
+    if ($updates -and $updates.Status -in @('ExecutionFailed','SourceError','ParseError','Unavailable','Unknown')) {
+        $wingetError = $updates.Reason
+        $auditComplete = $false
+    }
+
+    # Track Windows Update errors for audit completeness
+    $wuError = $null
+    if ($wu -and $wu.Status -eq 'ERROR') {
+        $wuError = $wu.Error
+        $auditComplete = $false
+    }
 
     # --- Count outcomes for executive summary ---
     $counts = @{
@@ -115,11 +135,16 @@ function New-AuditReport {
     AddBlank
 
     # High-level assessment
-    $criticalIssues = $counts.FAIL + $counts.VULNERABLE + $counts.PendingWindowsUpdates + $counts.AvailableWingetUpdates
-    if ($criticalIssues -gt 0) {
-        AddLine "**Overall: $criticalIssues critical finding(s) require attention** (Failed checks, vulnerable KEV entries, or pending updates)"
+    $criticalIssues = $counts.FAIL + $counts.VULNERABLE + $counts.PendingWindowsUpdates + $counts.AvailableWingetUpdates + $counts.ERROR + $counts.UNKNOWN + $counts['REQUIRES ELEVATION']
+    if (-not $auditComplete) {
+        AddLine "**Overall: Audit incomplete** - one or more required checks failed or were skipped."
+        if ($kevError) { AddLine "  - KEV catalog check failed: $kevError" }
+        if ($wuError) { AddLine "  - Windows Update check failed: $wuError" }
+        if ($wingetError) { AddLine "  - winget update check failed: $wingetError" }
+    } elseif ($criticalIssues -gt 0) {
+        AddLine "**Overall: $criticalIssues critical finding(s) require attention** (Failed checks, vulnerable KEV entries, pending updates, or unresolved errors)"
     } else {
-        AddLine "**Overall: No critical findings** (All checks passed, no vulnerable KEV entries, no pending Windows Updates)"
+        AddLine "**Overall: No critical findings**"
     }
     AddBlank
 
@@ -191,7 +216,12 @@ function New-AuditReport {
     # --- 4. CISA KEV Coverage ---
     AddSection "4. CISA KEV Coverage"
     if ($build -and -not [string]::IsNullOrWhiteSpace([string]$build.BuildNumber) -and $null -ne $build.UBR) {
-        if ($kevStatus.Count -gt 0) {
+        if ($kevError) {
+            AddLine "*KEV assessment: ERROR*"
+            AddLine "Could not retrieve or process the CISA KEV catalog: $kevError"
+            AddLine "KEV results are incomplete - this check could not be completed."
+            AddBlank
+        } elseif ($kevStatus.Count -gt 0) {
             AddLine "*KEV window: $($windowStart.ToString('yyyy-MM-dd')) to $($auditDate.ToString('yyyy-MM-dd')) (Microsoft Windows entries added in the $($LookbackMonths) months before the audit date)*"
             $patched   = @($kevStatus | Where-Object Status -like 'PATCHED*').Count
             $vulnerable= @($kevStatus | Where-Object Status -like 'VULNERABLE*').Count

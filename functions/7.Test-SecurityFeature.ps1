@@ -123,6 +123,87 @@ function Test-SecurityFeature {
         }
     }
 
+    # --- 1b. Device Encryption (Windows Home / BitLocker alternative) ---
+    $os = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
+    $isHome = $os -and $os.Caption -like "*Home*"
+    if ($isHome) {
+        try {
+            $devEnc = Get-CimInstance -Namespace "root\CIMV2\Security\MicrosoftVolumeEncryption" -ClassName Win32_EncryptableVolume -ErrorAction Stop
+            $encVolumes = @($devEnc)
+            $anyProtected = $false
+            foreach ($vol in $encVolumes) {
+                $protectionStatus = $null
+                try {
+                    $protectionStatus = $vol.GetProtectionStatus().ProtectionStatus
+                } catch {
+                    Write-Verbose "Failed to get protection status for volume: $($_.Exception.Message)"
+                }
+                if ($protectionStatus -eq 1) { $anyProtected = $true }
+            }
+            if ($anyProtected) {
+                $results += [PSCustomObject]@{
+                    CheckId    = "SEC-DE-001"
+                    Name       = "Device Encryption"
+                    Status     = "PASS"
+                    Severity   = "Informational"
+                    Summary    = "Device Encryption is active on at least one volume"
+                    Reason     = "Win32_EncryptableVolume reports ProtectionStatus=1 (protected) for at least one volume"
+                    Evidence   = @("Device Encryption active on Windows Home edition")
+                    Source     = "Win32_EncryptableVolume (root\CIMV2\Security\MicrosoftVolumeEncryption)"
+                    Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
+                    Confidence = "High"
+                    Items      = @($encVolumes | ForEach-Object { [PSCustomObject]@{ Volume = $_.DeviceID; ProtectionStatus = $_.GetProtectionStatus().ProtectionStatus } })
+                    Error      = $null
+                }
+            } else {
+                $results += [PSCustomObject]@{
+                    CheckId    = "SEC-DE-001"
+                    Name       = "Device Encryption"
+                    Status     = "FAIL"
+                    Severity   = "High"
+                    Summary    = "Device Encryption is not enabled on any volume"
+                    Reason     = "Win32_EncryptableVolume reports no protected volumes on Windows Home edition"
+                    Evidence   = @("Device Encryption not active on any volume")
+                    Source     = "Win32_EncryptableVolume (root\CIMV2\Security\MicrosoftVolumeEncryption)"
+                    Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
+                    Confidence = "High"
+                    Items      = @()
+                    Error      = $null
+                }
+            }
+        } catch {
+            $results += [PSCustomObject]@{
+                CheckId    = "SEC-DE-001"
+                Name       = "Device Encryption"
+                Status     = "ERROR"
+                Severity   = "Medium"
+                Summary    = "Unable to query Device Encryption status"
+                Reason     = "Win32_EncryptableVolume query failed: $($_.Exception.Message)"
+                Evidence   = @($_.Exception.Message)
+                Source     = "Win32_EncryptableVolume"
+                Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
+                Confidence = "N/A"
+                Items      = @()
+                Error      = $_.Exception.Message
+            }
+        }
+    } else {
+        $results += [PSCustomObject]@{
+            CheckId    = "SEC-DE-001"
+            Name       = "Device Encryption"
+            Status     = "NOT APPLICABLE"
+            Severity   = "Informational"
+            Summary    = "Device Encryption check not applicable on non-Home edition"
+            Reason     = "Device Encryption is a Windows Home edition feature; BitLocker is used on Pro/Enterprise/Education"
+            Evidence   = @("OSCaption: $($os.Caption)")
+            Source     = "Win32_OperatingSystem"
+            Timestamp  = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssK")
+            Confidence = "High"
+            Items      = @()
+            Error      = $null
+        }
+    }
+
     # --- 2. Secure Boot ---
     if (-not $isAdmin) {
         $results += [PSCustomObject]@{

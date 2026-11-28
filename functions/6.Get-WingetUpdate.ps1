@@ -283,6 +283,12 @@ function Get-WingetUpdate {
 
     $now = Get-Date
 
+    # Try structured Microsoft.WinGet.Client API first; fall back to console parsing
+    $structured = Get-WingetUpdateStructured -ErrorAction SilentlyContinue
+    if ($structured -and $structured.Status -ne $null) {
+        return $structured
+    }
+
     # Never equate missing output with a clean scan.
     if (-not (Get-Command $WinGetPath -ErrorAction SilentlyContinue)) {
         return [PSCustomObject]@{
