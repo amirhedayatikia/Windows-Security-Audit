@@ -74,7 +74,6 @@ Import-Module (Join-Path (Split-Path $PSScriptRoot -Parent) "win11-cve-audit.psd
 # Dot-source internal functions needed by tests
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "functions\6.Get-WingetUpdate.ps1")
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "functions\3.Get-KevVulnerabilityStatus.ps1")
-
 '@
 
 # --- Generate Verify-P01.ps1 test file ---
@@ -195,8 +194,8 @@ Describe "Get-WingetUpdate availability check" {
 '@
 $verifyWinget | Set-Content -Path (Join-Path $testDir 'Verify-Winget.ps1') -Encoding UTF8
 
-# --- Generate Report.Tests.ps1 test file (simple assertions, no parameter binding) ---
-# Pre-compute command availability at module load time (outside Describe blocks)
+# --- Generate Report.Tests.ps1 test file (simple assertions only) ---
+# Pre-compute everything at module load time - simple boolean flags
 $cmdNames = @(
     "New-AuditReport",
     "Get-KevVulnerabilityStatus",
@@ -212,23 +211,25 @@ $cmdNames = @(
     "Get-ReleaseChannelStatus"
 )
 
-$missingCmds = @()
+$allCmdsFound = $true
 foreach ($name in $cmdNames) {
     $cmd = Get-Command $name -ErrorAction SilentlyContinue
-    if (-not $cmd) { $missingCmds += $name }
+    if (-not $cmd) { $allCmdsFound = $false }
 }
 
-$missingCount = $missingCmds.Count
-$missingList = $missingCmds -join ", "
+$cmdOK = if ($allCmdsFound) { "true" } else { "false" }
 
 $reportTests = $moduleImport + @'
+# Pre-compute command availability
+$allCmdsFound = $true
+foreach ($name in @("New-AuditReport","Get-KevVulnerabilityStatus","ConvertFrom-WingetUpgradeOutput","Get-WingetUpdate","Test-SecurityFeature","Get-LocalSoftwareInventory","Get-PendingWindowsUpdate","Get-WindowsBuildInfo","Get-AppCveStatus","Get-WingetUpdateStructured","Get-SupportLifecycleStatus","Get-ReleaseChannelStatus")) {
+    $cmd = Get-Command $name -ErrorAction SilentlyContinue
+    if (-not $cmd) { $allCmdsFound = $false }
+}
+
 Describe "Function exports via module manifest" {
     It "All required functions are exported" {
-        $missingCount | Should Be 0
-    }
-
-    It "Missing commands list is empty" {
-        $missingList | Should Be ""
+        $allCmdsFound | Should Be $true
     }
 }
 
