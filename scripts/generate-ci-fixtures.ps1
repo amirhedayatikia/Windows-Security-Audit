@@ -74,6 +74,7 @@ Import-Module (Join-Path (Split-Path $PSScriptRoot -Parent) "win11-cve-audit.psd
 # Dot-source internal functions needed by tests
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "functions\6.Get-WingetUpdate.ps1")
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "functions\3.Get-KevVulnerabilityStatus.ps1")
+
 '@
 
 # --- Generate Verify-P01.ps1 test file ---
@@ -194,10 +195,9 @@ Describe "Get-WingetUpdate availability check" {
 '@
 $verifyWinget | Set-Content -Path (Join-Path $testDir 'Verify-Winget.ps1') -Encoding UTF8
 
-# --- Generate Report.Tests.ps1 test file (only function existence via Get-Command) ---
-$reportTests = $moduleImport + @'
-# Pre-validate all function commands exist at module load time
-$commandsToTest = @(
+# --- Generate Report.Tests.ps1 test file (simple function existence checks) ---
+# Pre-compute command availability at module load time (outside Describe blocks)
+$cmdNames = @(
     "New-AuditReport",
     "Get-KevVulnerabilityStatus",
     "ConvertFrom-WingetUpgradeOutput",
@@ -213,16 +213,37 @@ $commandsToTest = @(
     "Get-SupportLifecycleStatus"
 )
 
-$foundCommands = @()
+$cmdCheck = @'
+$commandNames = @(
+    "New-AuditReport",
+    "Get-KevVulnerabilityStatus",
+    "ConvertFrom-WingetUpgradeOutput",
+    "Get-WingetUpdate",
+    "Test-SecurityFeature",
+    "Get-LocalSoftwareInventory",
+    "Get-PendingWindowsUpdate",
+    "Get-WindowsBuildInfo",
+    "Get-AppCveStatus",
+    "Get-WingetUpdateStructured",
+    "Get-SupportLifecycleStatus",
+    "Get-ReleaseChannelStatus",
+    "Get-SupportLifecycleStatus"
+)
+
 $missingCommands = @()
-foreach ($cmdName in $commandsToTest) {
+foreach ($cmdName in $commandNames) {
     $cmd = Get-Command $cmdName -ErrorAction SilentlyContinue
-    if ($cmd) { $foundCommands += $cmdName } else { $missingCommands += $cmdName }
+    if (-not $cmd) { $missingCommands += $cmdName }
 }
 
+$missingCommandsCount = $missingCommands.Count
+
+'@
+
+$reportTests = $moduleImport + $cmdCheck + @'
 Describe "Function exports via module manifest" {
     It "All required functions are exported" {
-        $missingCommands.Count | Should Be 0
+        $missingCommandsCount | Should Be 0
     }
 
     It "New-AuditReport is available" {
