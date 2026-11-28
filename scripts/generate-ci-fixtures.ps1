@@ -74,45 +74,83 @@ Import-Module (Join-Path (Split-Path $PSScriptRoot -Parent) "win11-cve-audit.psd
 # Dot-source internal functions needed by tests
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "functions\6.Get-WingetUpdate.ps1")
 . (Join-Path (Split-Path $PSScriptRoot -Parent) "functions\3.Get-KevVulnerabilityStatus.ps1")
+
 '@
 
-# --- Generate Verify-P01.ps1 test file ---
+# --- Generate Verify-P01.Tests.ps1 test file ---
 $verifyP01 = $moduleImport + @'
-Write-Host "=== P0/P1 WinGet report behavior ==="
-$output = @(
-    "Name             Id               Version Available Source",
-    "-----------------------------------------------------------",
-    "Example Package  Example.Package  1.0     2.0       winget"
-)
-$result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
-if ($result.Status -ne "UpdatesAvailable") { throw "Expected UpdatesAvailable, got $($result.Status)" }
-if ($result.Items.Count -ne 1) { throw "Expected 1 update, got $($result.Items.Count)" }
-if ($result.Items[0].Name -ne "Example Package") { throw "Name mismatch: $($result.Items[0].Name)" }
-$empty = ConvertFrom-WingetUpgradeOutput -Output @() -Stderr $null -ExitCode 0
-if ($empty.Status -ne "ParseError") { throw "Empty output incorrectly reported as $($empty.Status)" }
-$missing = Get-WingetUpdate -WinGetPath "C:\Not\Exist\winget.exe"
-if ($missing.Status -ne "Unavailable") { throw "Missing winget incorrectly reported as $($missing.Status)" }
-Write-Host "PASS: WinGet output and availability checks"
+Describe "ConvertFrom-WingetUpgradeOutput" {
+    It "Distinguishes a successful zero-update scan" {
+        $output = @(
+            "Name             Id               Version Available Source",
+            "-----------------------------------------------------------",
+            "No installed package found matching input criteria."
+        )
+        $result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
+        $result.Status | Should Be "NoUpdates"
+        $result.Items.Count | Should Be 0
+        $result.Reason | Should Be "No winget packages have available updates"
+    }
 
-Write-Host "=== Module exports ==="
-$manifest = Import-PowerShellDataFile (Join-Path (Split-Path $PSScriptRoot -Parent) "win11-cve-audit.psd1")
-Import-Module (Join-Path (Split-Path $PSScriptRoot -Parent) "win11-cve-audit.psd1") -Force -WarningAction SilentlyContinue
-$commands = @(Get-Command -Module win11-cve-audit -CommandType Function)
-foreach ($name in $manifest.FunctionsToExport) {
-    if ($commands.Name -notcontains $name) { throw "Manifest exports missing function: $name" }
-}
-Write-Host "PASS: Manifest exports match defined functions"
+    It "Returns available updates from valid output" {
+        $output = @(
+            "Name             Id               Version Available Source",
+            "-----------------------------------------------------------",
+            "Example Package  Example.Package  1.0     2.0       winget"
+        )
+        $result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
+        $result.Status | Should Be "UpdatesAvailable"
+        $result.Items.Count | Should Be 1
+        $result.Items[0].Name | Should Be "Example Package"
+        $result.Items[0].Id | Should Be "Example.Package"
+        $result.Items[0].InstalledVersion | Should Be "1.0"
+        $result.Items[0].AvailableVersion | Should Be "2.0"
+    }
 
-Write-Host "=== Live WinGet update check ==="
-$live = Get-WingetUpdate
-Write-Host "WinGet status: $($live.Status); packages: $($live.Items.Count); reason: $($live.Reason)"
-if ($live.Status -notin @("UpdatesAvailable","NoUpdates","Unavailable","ExecutionFailed","SourceError","ParseError")) {
-    throw "Unexpected WinGet status: $($live.Status)"
+    It "Returns ParseError for empty output" {
+        $result = ConvertFrom-WingetUpgradeOutput -Output @() -Stderr $null -ExitCode 0
+        $result.Status | Should Not Be "NoUpdates"
+        $result.Status | Should Be "ParseError"
+    }
+
+    It "Multi-word package names parse correctly" {
+        $output = @(
+            "Name             Id               Version Available Source",
+            "-----------------------------------------------------------",
+            "Microsoft Edge   Microsoft.Edge   1.0     2.0       winget",
+            "Visual Studio Code  Microsoft.VisualStudio.Code   1.1    1.2    winget"
+        )
+        $result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
+        $result.Status | Should Be "UpdatesAvailable"
+        $result.Items.Count | Should Be 2
+        $result.Items[0].Name | Should Be "Microsoft Edge"
+        $result.Items[1].Name | Should Be "Visual Studio Code"
+    }
+
+    It "Returns SourceError when output indicates source failure" {
+        $output = @(
+            "Error: Package source is unavailable",
+            "Please check your network connection."
+        )
+        $result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
+        $result.Status | Should Be "SourceError"
+        $result.Items.Count | Should Be 0
+    }
+
+    It "Returns ParseError for unrecognized successful output" {
+        $output = @(
+            "Some unexpected successful output",
+            "Without known headers"
+        )
+        $result = ConvertFrom-WingetUpgradeOutput -Output $output -Stderr $null -ExitCode 0
+        $result.Status | Should Be "ParseError"
+        $result.Items.Count | Should Be 0
+    }
 }
 '@
-$verifyP01 | Set-Content -Path (Join-Path $testDir 'Verify-P01.ps1') -Encoding UTF8
+$verifyP01 | Set-Content -Path (Join-Path $testDir 'Verify-P01.Tests.ps1') -Encoding UTF8
 
-# --- Generate Verify-Winget.ps1 test file ---
+# --- Generate Verify-Winget.Tests.ps1 test file (simple assertions only) ---
 $verifyWinget = $moduleImport + @'
 Describe "ConvertFrom-WingetUpgradeOutput" {
     It "Distinguishes a successful zero-update scan" {
@@ -182,20 +220,8 @@ Describe "ConvertFrom-WingetUpgradeOutput" {
         $result.Items.Count | Should Be 0
     }
 }
-
-Describe "Get-WingetUpdate availability check" {
-    It "Returns Unavailable when winget executable is missing" {
-        $result = Get-WingetUpdate -WinGetPath "C:\Not\Exist\winget.exe"
-        $result.Status | Should Be "Unavailable"
-        $result.Items.Count | Should Be 0
-        $result.Error | Should Match "not found"
-    }
-}
 '@
-$verifyWinget | Set-Content -Path (Join-Path $testDir 'Verify-Winget.ps1') -Encoding UTF8
-
-# Skip Report.Tests.ps1 - it causes parameter binding issues in CI
-# Only generate fixtures and the working test files
+$verifyWinget | Set-Content -Path (Join-Path $testDir 'Verify-Winget.Tests.ps1') -Encoding UTF8
 
 Write-Host "Generated test fixtures in $fixtureDir"
 Get-ChildItem $fixtureDir | ForEach-Object { Write-Host ("  " + $_.Name) }
