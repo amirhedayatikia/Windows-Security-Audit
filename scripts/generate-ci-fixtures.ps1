@@ -194,67 +194,94 @@ Describe "Get-WingetUpdate availability check" {
 '@
 $verifyWinget | Set-Content -Path (Join-Path $testDir 'Verify-Winget.ps1') -Encoding UTF8
 
-# --- Generate Report.Tests.ps1 test file (only module loading and function existence) ---
+# --- Generate Report.Tests.ps1 test file (only function existence via Get-Command) ---
 $reportTests = $moduleImport + @'
-Describe "Module loading and function availability" {
-    It "Module loads without error" {
-        $module = Get-Module win11-cve-audit
-        $module | Should Not Be $null
+# Pre-validate all function commands exist at module load time
+$commandsToTest = @(
+    "New-AuditReport",
+    "Get-KevVulnerabilityStatus",
+    "ConvertFrom-WingetUpgradeOutput",
+    "Get-WingetUpdate",
+    "Test-SecurityFeature",
+    "Get-LocalSoftwareInventory",
+    "Get-PendingWindowsUpdate",
+    "Get-WindowsBuildInfo",
+    "Get-AppCveStatus",
+    "Get-WingetUpdateStructured",
+    "Get-SupportLifecycleStatus",
+    "Get-ReleaseChannelStatus",
+    "Get-SupportLifecycleStatus"
+)
+
+$foundCommands = @()
+$missingCommands = @()
+foreach ($cmdName in $commandsToTest) {
+    $cmd = Get-Command $cmdName -ErrorAction SilentlyContinue
+    if ($cmd) { $foundCommands += $cmdName } else { $missingCommands += $cmdName }
+}
+
+Describe "Function exports via module manifest" {
+    It "All required functions are exported" {
+        $missingCommands.Count | Should Be 0
     }
 
-    It "New-AuditReport function exists" {
+    It "New-AuditReport is available" {
         (Get-Command New-AuditReport -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 
-    It "Get-KevVulnerabilityStatus function exists" {
+    It "Get-KevVulnerabilityStatus is available" {
         (Get-Command Get-KevVulnerabilityStatus -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 
-    It "ConvertFrom-WingetUpgradeOutput function exists" {
+    It "ConvertFrom-WingetUpgradeOutput is available" {
         (Get-Command ConvertFrom-WingetUpgradeOutput -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 
-    It "Get-WingetUpdate function exists" {
+    It "Get-WingetUpdate is available" {
         (Get-Command Get-WingetUpdate -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 
-    It "Test-SecurityFeature function exists" {
+    It "Test-SecurityFeature is available" {
         (Get-Command Test-SecurityFeature -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 
-    It "Get-LocalSoftwareInventory function exists" {
+    It "Get-LocalSoftwareInventory is available" {
         (Get-Command Get-LocalSoftwareInventory -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 
-    It "Get-PendingWindowsUpdate function exists" {
+    It "Get-PendingWindowsUpdate is available" {
         (Get-Command Get-PendingWindowsUpdate -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 
-    It "Get-WindowsBuildInfo function exists" {
+    It "Get-WindowsBuildInfo is available" {
         (Get-Command Get-WindowsBuildInfo -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 
-    It "Get-AppCveStatus function exists" {
+    It "Get-AppCveStatus is available" {
         (Get-Command Get-AppCveStatus -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 
-    It "Get-WingetUpdateStructured function exists" {
+    It "Get-WingetUpdateStructured is available" {
         (Get-Command Get-WingetUpdateStructured -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 
-    It "Get-SupportLifecycleStatus function exists" {
+    It "Get-SupportLifecycleStatus is available" {
         (Get-Command Get-SupportLifecycleStatus -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 
-    It "Get-ReleaseChannelStatus function exists" {
+    It "Get-ReleaseChannelStatus is available" {
         (Get-Command Get-ReleaseChannelStatus -ErrorAction SilentlyContinue) | Should Not Be $null
     }
 }
 
-Describe "Get-KevVulnerabilityStatus parameter validation" {
-    It "Requires BuildNumber parameter" {
+Describe "Get-KevVulnerabilityStatus parameter metadata" {
+    It "BuildNumber parameter is mandatory" {
         $cmd = Get-Command Get-KevVulnerabilityStatus
         $cmd.Parameters["BuildNumber"].IsMandatory | Should Be $true
+    }
+
+    It "UBR parameter is mandatory" {
+        $cmd = Get-Command Get-KevVulnerabilityStatus
         $cmd.Parameters["UBR"].IsMandatory | Should Be $true
     }
 }
