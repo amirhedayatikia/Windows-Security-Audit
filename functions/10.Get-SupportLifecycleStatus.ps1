@@ -74,8 +74,7 @@ function Get-SupportLifecycleStatus {
             }
         }
 
-        $releaseDate = if ($selected.releaseDate) { [datetime]$selected.releaseDate } else { $null }
-        $eolDate     = if ($selected.eol) { [datetime]$selected.eol } else { $null }
+        $eolDate = if ($selected.eol) { [datetime]$selected.eol } else { $null }
         $today       = Get-Date
 
         $isSupported = $false

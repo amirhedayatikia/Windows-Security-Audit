@@ -42,7 +42,7 @@ function Get-ReleaseChannelStatus {
                 }
             }
         } catch {
-            # Key not found - try next path
+            Write-Verbose "Registry path $($p.Path) not accessible: $($_.Exception.Message)"
         }
     }
 
@@ -56,7 +56,7 @@ function Get-ReleaseChannelStatus {
             $insiderRing = $insiderPolicy.Ring
         }
     } catch {
-        # Ignore
+        Write-Verbose "Failed to read Insider policy: $($_.Exception.Message)"
     }
 
     if ($isInsider) {

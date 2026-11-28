@@ -285,7 +285,7 @@ function Get-WingetUpdate {
 
     # Try structured Microsoft.WinGet.Client API first; fall back to console parsing
     $structured = Get-WingetUpdateStructured -ErrorAction SilentlyContinue
-    if ($structured -and $structured.Status -ne $null) {
+    if ($structured -and $null -ne $structured.Status) {
         return $structured
     }
 
