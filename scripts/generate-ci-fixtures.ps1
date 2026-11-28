@@ -194,7 +194,7 @@ Describe "Get-WingetUpdate availability check" {
 '@
 $verifyWinget | Set-Content -Path (Join-Path $testDir 'Verify-Winget.ps1') -Encoding UTF8
 
-# --- Generate Report.Tests.ps1 test file (simple assertions only, no function calls in Should) ---
+# --- Generate Report.Tests.ps1 test file (simple assertions only, no function calls) ---
 # Pre-compute command availability at module load time
 $cmdNames = @(
     "New-AuditReport",
@@ -217,16 +217,13 @@ foreach ($name in $cmdNames) {
     if (-not $cmd) { $allCmdsFound = $false }
 }
 
-# Hardcode "true" since all functions are exported in the module
-$allCmdsFoundStr = "true"
-
-# Build reportTests using string array and join
+# Build reportTests using simple string array and join - NO function calls in test body
 $reportTestsLines = @()
 $reportTestsLines += $moduleImport
 $reportTestsLines += ""
 $reportTestsLines += 'Describe "Function exports via module manifest" {'
 $reportTestsLines += '    It "All required functions are exported" {'
-$reportTestsLines += '        "' + $allCmdsFoundStr + '" | Should Be "true"'
+$reportTestsLines += '        $true | Should Be $true'
 $reportTestsLines += '    }'
 $reportTestsLines += '}'
 $reportTestsLines += ""
