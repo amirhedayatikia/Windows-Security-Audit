@@ -68,23 +68,13 @@ Please check your network connection and try again.
 '@
 $wingetSourceErr | Set-Content -Path (Join-Path $fixtureDir 'winget-source-err.txt') -Encoding UTF8
 
-# Common function imports for all test files
-$commonImports = @'
-$root = Join-Path $PSScriptRoot ".."
-# Import all functions needed by New-AuditReport
-. (Join-Path $root "functions\0.Invoke-AuditRestMethod.ps1")
-. (Join-Path $root "functions\1.Get-WindowsBuildInfo.ps1")
-. (Join-Path $root "functions\2.Get-LocalSoftwareInventory.ps1")
-. (Join-Path $root "functions\3.Get-KevVulnerabilityStatus.ps1")
-. (Join-Path $root "functions\5.Get-AppCveStatus.ps1")
-. (Join-Path $root "functions\6.Get-WingetUpdate.ps1")
-. (Join-Path $root "functions\7.Test-SecurityFeature.ps1")
-. (Join-Path $root "functions\8.New-AuditReport.ps1")
-. (Join-Path $root "functions\9.Get-PendingWindowsUpdate.ps1")
+# Use module import - all functions are exported via module manifest
+$moduleImport = @'
+Import-Module (Join-Path $PSScriptRoot "..\win11-cve-audit.psd1") -Force -ErrorAction Stop
 '@
 
 # --- Generate Verify-P01.ps1 test file ---
-$verifyP01 = $commonImports + @'
+$verifyP01 = $moduleImport + @'
 Write-Host "=== P0/P1 WinGet report behavior ==="
 $output = @(
     "Name             Id               Version Available Source",
@@ -102,8 +92,8 @@ if ($missing.Status -ne "Unavailable") { throw "Missing winget incorrectly repor
 Write-Host "PASS: WinGet output and availability checks"
 
 Write-Host "=== Module exports ==="
-$manifest = Import-PowerShellDataFile (Join-Path $root "win11-cve-audit.psd1")
-Import-Module (Join-Path $root "win11-cve-audit.psd1") -Force -WarningAction SilentlyContinue
+$manifest = Import-PowerShellDataFile (Join-Path $PSScriptRoot "..\win11-cve-audit.psd1")
+Import-Module (Join-Path $PSScriptRoot "..\win11-cve-audit.psd1") -Force -WarningAction SilentlyContinue
 $commands = @(Get-Command -Module win11-cve-audit -CommandType Function)
 foreach ($name in $manifest.FunctionsToExport) {
     if ($commands.Name -notcontains $name) { throw "Manifest exports missing function: $name" }
@@ -120,7 +110,7 @@ if ($live.Status -notin @("UpdatesAvailable","NoUpdates","Unavailable","Executio
 $verifyP01 | Set-Content -Path (Join-Path $testDir 'Verify-P01.ps1') -Encoding UTF8
 
 # --- Generate Verify-Winget.ps1 test file ---
-$verifyWinget = $commonImports + @'
+$verifyWinget = $moduleImport + @'
 Describe "ConvertFrom-WingetUpgradeOutput" {
     It "Distinguishes a successful zero-update scan" {
         $output = @(
@@ -202,7 +192,7 @@ Describe "Get-WingetUpdate availability check" {
 $verifyWinget | Set-Content -Path (Join-Path $testDir 'Verify-Winget.ps1') -Encoding UTF8
 
 # --- Generate Report.Tests.ps1 test file (simplified to avoid parameter binding issues in CI) ---
-$reportTests = $commonImports + @'
+$reportTests = $moduleImport + @'
 Describe "New-AuditReport executive summary hardening" {
     It "Reports executive summary section" {
         $report = New-AuditReport -OutputPath (Join-Path $env:TEMP "test-audit-report.md") -LookbackMonths 12 -ErrorAction SilentlyContinue
@@ -249,7 +239,6 @@ Describe "New-AuditReport executive summary hardening" {
 
 Describe "Get-KevVulnerabilityStatus parameter validation" {
     It "Requires BuildNumber parameter" {
-        # Test that function is loadable and has mandatory parameters
         $cmd = Get-Command Get-KevVulnerabilityStatus
         $cmd.Parameters["BuildNumber"].IsMandatory | Should Be $true
         $cmd.Parameters["UBR"].IsMandatory | Should Be $true
