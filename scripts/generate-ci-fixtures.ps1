@@ -69,9 +69,9 @@ Please check your network connection and try again.
 $wingetSourceErr | Set-Content -Path (Join-Path $fixtureDir 'winget-source-err.txt') -Encoding UTF8
 
 # Use module import + dot-source internal functions for tests
-# Tests are in tests/ subdir, repo root is one level up from tests/
+# In CI, working directory is the repo root; use $PWD for reliability
 $moduleImport = @'
-$repoRoot = Split-Path $PSScriptRoot -Parent
+$repoRoot = $PWD.ProviderPath
 Import-Module (Join-Path $repoRoot "win11-cve-audit.psd1") -Force -ErrorAction Stop
 # Dot-source internal functions needed by tests
 . (Join-Path $repoRoot "functions\6.Get-WingetUpdate.ps1")
