@@ -210,7 +210,7 @@ jobs:
           Write-Host "✓ All 10 report sections present"
 
       - name: Upload audit report artifact
-        uses: actions/upload-artifact@v4.6.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: security-audit-report
           path: $(Join-Path $env:TEMP 'integration-audit-report.md')
