@@ -195,8 +195,8 @@ Describe "Get-WingetUpdate availability check" {
 '@
 $verifyWinget | Set-Content -Path (Join-Path $testDir 'Verify-Winget.ps1') -Encoding UTF8
 
-# --- Generate Report.Tests.ps1 test file (simple function existence via module) ---
-# Check all required commands are available at module load time (outside Describe blocks)
+# --- Generate Report.Tests.ps1 test file (simple assertions, no parameter binding) ---
+# Pre-compute command availability at module load time (outside Describe blocks)
 $cmdNames = @(
     "New-AuditReport",
     "Get-KevVulnerabilityStatus",
@@ -209,8 +209,7 @@ $cmdNames = @(
     "Get-AppCveStatus",
     "Get-WingetUpdateStructured",
     "Get-SupportLifecycleStatus",
-    "Get-ReleaseChannelStatus",
-    "Get-SupportLifecycleStatus"
+    "Get-ReleaseChannelStatus"
 )
 
 $missingCmds = @()
@@ -220,6 +219,7 @@ foreach ($name in $cmdNames) {
 }
 
 $missingCount = $missingCmds.Count
+$missingList = $missingCmds -join ", "
 
 $reportTests = $moduleImport + @'
 Describe "Function exports via module manifest" {
@@ -227,52 +227,8 @@ Describe "Function exports via module manifest" {
         $missingCount | Should Be 0
     }
 
-    It "New-AuditReport is available" {
-        (Get-Command New-AuditReport -ErrorAction SilentlyContinue) | Should Not Be $null
-    }
-
-    It "Get-KevVulnerabilityStatus is available" {
-        (Get-Command Get-KevVulnerabilityStatus -ErrorAction SilentlyContinue) | Should Not Be $null
-    }
-
-    It "ConvertFrom-WingetUpgradeOutput is available" {
-        (Get-Command ConvertFrom-WingetUpgradeOutput -ErrorAction SilentlyContinue) | Should Not Be $null
-    }
-
-    It "Get-WingetUpdate is available" {
-        (Get-Command Get-WingetUpdate -ErrorAction SilentlyContinue) | Should Not Be $null
-    }
-
-    It "Test-SecurityFeature is available" {
-        (Get-Command Test-SecurityFeature -ErrorAction SilentlyContinue) | Should Not Be $null
-    }
-
-    It "Get-LocalSoftwareInventory is available" {
-        (Get-Command Get-LocalSoftwareInventory -ErrorAction SilentlyContinue) | Should Not Be $null
-    }
-
-    It "Get-PendingWindowsUpdate is available" {
-        (Get-Command Get-PendingWindowsUpdate -ErrorAction SilentlyContinue) | Should Not Be $null
-    }
-
-    It "Get-WindowsBuildInfo is available" {
-        (Get-Command Get-WindowsBuildInfo -ErrorAction SilentlyContinue) | Should Not Be $null
-    }
-
-    It "Get-AppCveStatus is available" {
-        (Get-Command Get-AppCveStatus -ErrorAction SilentlyContinue) | Should Not Be $null
-    }
-
-    It "Get-WingetUpdateStructured is available" {
-        (Get-Command Get-WingetUpdateStructured -ErrorAction SilentlyContinue) | Should Not Be $null
-    }
-
-    It "Get-SupportLifecycleStatus is available" {
-        (Get-Command Get-SupportLifecycleStatus -ErrorAction SilentlyContinue) | Should Not Be $null
-    }
-
-    It "Get-ReleaseChannelStatus is available" {
-        (Get-Command Get-ReleaseChannelStatus -ErrorAction SilentlyContinue) | Should Not Be $null
+    It "Missing commands list is empty" {
+        $missingList | Should Be ""
     }
 }
 
