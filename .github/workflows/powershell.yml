@@ -150,10 +150,11 @@ jobs:
       - name: Run Pester unit tests
         shell: pwsh
         run: |
-          Install-Module Pester -Force -Scope CurrentUser -ErrorAction SilentlyContinue
-          $testResults = Invoke-Pester -Script 'tests\Verify-P01.ps1' -Output Detailed -PassThru
-          $testResults += Invoke-Pester -Script 'tests\Verify-Winget.ps1' -Output Detailed -PassThru
-          $testResults += Invoke-Pester -Script 'tests\Report.Tests.ps1' -Output Detailed -PassThru
+          Install-Module Pester -RequiredVersion 6.2.0 -Force -Scope CurrentUser -ErrorAction SilentlyContinue
+          Import-Module Pester -MinimumVersion 6.0 -Force -ErrorAction SilentlyContinue
+          $testResults = Invoke-Pester -Path 'tests\Verify-P01.ps1' -Output Detailed -PassThru
+          $testResults += Invoke-Pester -Path 'tests\Verify-Winget.ps1' -Output Detailed -PassThru
+          $testResults += Invoke-Pester -Path 'tests\Report.Tests.ps1' -Output Detailed -PassThru
           if ($testResults.FailedCount -gt 0) {
             Write-Error "Pester tests failed: $($testResults.FailedCount) of $($testResults.TotalCount)"
             exit 1
